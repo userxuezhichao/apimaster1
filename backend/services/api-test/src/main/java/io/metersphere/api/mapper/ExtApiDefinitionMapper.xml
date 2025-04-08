@@ -1,0 +1,894 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.api.mapper.ExtApiDefinitionMapper">
+
+    <resultMap id="ApiDefinitionDTO" type="io.metersphere.api.dto.definition.ApiDefinitionDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <resultMap id="BaseResultMap" type="io.metersphere.api.domain.ApiDefinition">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <resultMap id="ApiResultMap" type="io.metersphere.api.dto.definition.ApiDefinitionWithBlob">
+        <result column="request" jdbcType="LONGVARBINARY" property="request" />
+        <result column="response" jdbcType="LONGVARBINARY" property="response" />
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <update id="deleteApiToGc">
+        update api_definition
+        set delete_user = #{userId},delete_time = #{time}, deleted = 1 , module_id = 'root'
+        where ref_id in
+        <foreach collection="ids" item="v" separator="," open="(" close=")">
+            #{v}
+        </foreach>
+    </update>
+    <select id="list" resultMap="ApiDefinitionDTO">
+        select
+        api_definition.id, api_definition.`name`, api_definition.protocol, api_definition.`method`,
+        api_definition.`path`, api_definition.`status`, api_definition.num, api_definition.tags, api_definition.pos,
+        api_definition.project_id, api_definition.module_id, api_definition.latest, api_definition.version_id,
+        api_definition.ref_id, api_definition.description, api_definition.create_time, api_definition.create_user,
+        api_definition.update_time, api_definition.update_user, api_definition.delete_user, api_definition.delete_time,
+        api_definition.deleted, project_version.name as version_name
+        from api_definition
+        LEFT JOIN project_version ON project_version.id = api_definition.version_id
+        where api_definition.deleted = #{request.deleted}
+        <include refid="queryWhereCondition"/>
+
+    </select>
+
+    <select id="listDoc" resultMap="ApiDefinitionDTO">
+        select
+        api_definition.id, api_definition.`name`, api_definition.protocol, api_definition.`method`,
+        api_definition.`path`, api_definition.`status`, api_definition.num, api_definition.tags, api_definition.pos,
+        api_definition.project_id, api_definition.module_id, api_definition.latest, api_definition.version_id,
+        api_definition.ref_id, api_definition.description, api_definition.create_time, api_definition.create_user,
+        api_definition.update_time, api_definition.update_user, api_definition.delete_user, api_definition.delete_time,
+        api_definition.deleted, project_version.name as version_name
+        from api_definition
+        LEFT JOIN project_version ON project_version.id = api_definition.version_id
+        where api_definition.deleted = #{request.deleted}
+        <include refid="queryDocWhereCondition"/>
+    </select>
+
+    <select id="selectNotInTrashCaseIdsByApiIds" resultType="io.metersphere.api.domain.ApiTestCase">
+        select atc.id, atc.api_definition_id
+        FROM api_test_case atc
+        WHERE atc.deleted = 0 and atc.api_definition_id IN
+        <foreach collection="apiIds" item="value" separator="," open="(" close=")">
+            #{value}
+        </foreach>
+    </select>
+
+    <select id="getPos" resultType="java.lang.Long">
+        SELECT pos
+        FROM api_definition
+        WHERE project_id = #{projectId}
+        ORDER BY pos DESC
+        LIMIT 1;
+    </select>
+
+    <select id="getIds" resultType="java.lang.String">
+        SELECT id
+        FROM api_definition
+        where project_id = #{projectId} and deleted = #{deleted}
+          <if test="protocols != null and protocols.size() > 0">
+            AND protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+          </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() != 0">
+            AND module_id IN
+            <foreach collection="request.moduleIds" item="item" open="(" separator="," close=")">
+                #{item}
+            </foreach>
+        </if>
+        <if test="includeIds != null and includeIds.size() > 0">
+            and api_definition.id in
+            <foreach collection="includeIds" item="includeId" separator="," open="(" close=")">
+                #{includeId}
+            </foreach>
+        </if>
+        <if test="excludeIds != null and excludeIds.size() > 0">
+            and api_definition.id not in
+            <foreach collection="excludeIds" item="excludeId" separator="," open="(" close=")">
+                #{excludeId}
+            </foreach>
+        </if>
+        <include refid="queryWhereConditionByBaseQueryRequest"/>
+    </select>
+
+    <select id="getIdsBySort" resultType="java.lang.String">
+        SELECT id
+        FROM api_definition
+        where project_id = #{projectId} and deleted = #{deleted}
+        <if test="protocols != null and protocols.size() > 0">
+            AND protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() != 0">
+            AND module_id IN
+            <foreach collection="request.moduleIds" item="item" open="(" separator="," close=")">
+                #{item}
+            </foreach>
+        </if>
+        <include refid="queryWhereConditionByBaseQueryRequest"/>
+        <if test="orderColumns != null">
+            ORDER BY ${orderColumns}
+        </if>
+    </select>
+
+
+    <select id="getRefIds" resultType="java.lang.String">
+        SELECT
+        ref_id
+        FROM
+        api_definition
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = #{deleted}
+        group by ref_id
+    </select>
+
+    <select id="getIdsByRefId" resultType="java.lang.String">
+        SELECT
+        id
+        FROM
+        api_definition
+        where ref_id in
+        <foreach collection="refIds" item="id" open="(" separator="," close=")">
+          #{id}
+        </foreach>
+        and deleted = #{deleted}
+    </select>
+
+    <select id="getApiDefinitionByRefId" resultType="io.metersphere.api.dto.definition.ApiDefinitionVersionDTO">
+        SELECT api_definition.id,
+               api_definition.`name`,
+               api_definition.version_id,
+               api_definition.ref_id,
+               api_definition.project_id,
+               project_version.name as version_name
+        from api_definition
+         LEFT JOIN project_version ON project_version.id = api_definition.version_id
+        where api_definition.ref_id = #{refId}
+    </select>
+
+    <select id="getTagsByIds" resultMap="BaseResultMap">
+        select id, tags from api_definition
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = #{deleted}
+    </select>
+    <select id="importList" resultType="io.metersphere.api.dto.converter.ApiDefinitionDetail">
+        select
+        api_definition.id, api_definition.`name`, api_definition.protocol,
+        api_definition.`method`,api_definition.project_id,
+        api_definition.`path`, api_definition.version_id,
+        api_definition.ref_id, api_definition.module_id
+        from api_definition
+        LEFT JOIN project_version ON project_version.id = api_definition.version_id
+        where api_definition.deleted = false
+        <include refid="queryWhereCondition"/>
+    </select>
+    <select id="selectIdsByIdsAndDeleted" resultType="java.lang.String">
+        select id from api_definition
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = #{deleted}
+    </select>
+    <select id="selectByProjectId" resultType="java.lang.String">
+        select id from api_definition
+        where project_id = #{projectId}
+    </select>
+
+    <update id="batchDeleteByRefId">
+        update api_definition
+        set deleted = 1,
+        delete_user = #{userId},
+        delete_time = UNIX_TIMESTAMP()*1000
+        where ref_id in
+        <foreach collection="refIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = false and project_id = #{projectId}
+    </update>
+
+    <update id="batchDeleteById">
+        update api_definition
+        set deleted = 1,
+        delete_user = #{userId},
+        delete_time = UNIX_TIMESTAMP()*1000
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = false and project_id = #{projectId}
+    </update>
+
+    <update id="batchRecoverById">
+        update api_definition
+        set deleted = 0,
+        delete_user = null,
+        delete_time = null,
+        update_user = #{userId},
+        update_time = UNIX_TIMESTAMP()*1000
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = true and project_id = #{projectId}
+    </update>
+
+
+    <update id="batchMove">
+        update api_definition
+        set module_id = #{request.moduleId},
+        update_user = #{userId},
+        update_time = UNIX_TIMESTAMP()*1000
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = false
+        and project_id = #{request.projectId}
+    </update>
+
+    <update id="clearLatestVersion">
+        update api_definition
+        set latest = 0
+        where ref_id = #{refId}
+          and project_id = #{projectId}
+    </update>
+
+    <update id="updateLatestVersion">
+        update api_definition
+        set latest = 1
+        where id = #{id}
+          and project_id = #{projectId}
+    </update>
+    <update id="updatePos">
+        update api_definition
+        set pos =#{pos}
+        where id = #{id}
+    </update>
+
+    <sql id="queryWhereCondition">
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            api_definition.num like concat('%', #{request.keyword},'%')
+            or api_definition.name like concat('%', #{request.keyword},'%')
+            or api_definition.path like concat('%', #{request.keyword},'%')
+            or api_definition.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <if test="request.projectId != null and request.projectId != ''">
+            and api_definition.project_id = #{request.projectId}
+        </if>
+        <if test="request.includeIds != null and request.includeIds.size() > 0">
+            and api_definition.id in
+            <foreach collection="request.includeIds" item="includeId" separator="," open="(" close=")">
+                #{includeId}
+            </foreach>
+        </if>
+        <if test="request.excludeIds != null and request.excludeIds.size() > 0">
+            and api_definition.id not in
+            <foreach collection="request.excludeIds" item="excludeId" separator="," open="(" close=")">
+                #{excludeId}
+            </foreach>
+        </if>
+        <if test="request.protocols != null and request.protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="request.protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and api_definition.module_id in
+            <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
+                #{nodeId}
+            </foreach>
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.filter"/>
+        </include>
+
+        <include refid="combine">
+            <property name="combineSearch" value="request.combineSearch"/>
+            <property name="projectId" value="${request.projectId}"/>
+            <property name="deleted" value="${request.deleted}"/>
+        </include>
+
+        <include refid="queryVersionCondition">
+            <property name="versionTable" value="api_definition"/>
+        </include>
+    </sql>
+
+    <sql id="queryDocWhereCondition">
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            api_definition.num like concat('%', #{request.keyword},'%')
+            or api_definition.name like concat('%', #{request.keyword},'%')
+            or api_definition.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <if test="request.projectId != null and request.projectId != ''">
+            and api_definition.project_id = #{request.projectId}
+        </if>
+        <if test="request.protocols != null and request.protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="request.protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and api_definition.module_id in
+            <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
+                #{nodeId}
+            </foreach>
+        </if>
+
+        <include refid="queryDocVersionCondition">
+            <property name="versionTable" value="api_definition"/>
+        </include>
+    </sql>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='status'">
+                            and api_definition.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='method'">
+                            and api_definition.method in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='createUser'">
+                            and api_definition.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='versionId'">
+                            and api_definition.version_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='deleteUser'">
+                            and api_definition.delete_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key.startsWith('custom_single')">
+                            and api_definition.id in (
+                            select api_id from api_definition_custom_field where concat('custom_single_', field_id) = #{key}
+                            and trim(both '"' from `value`) in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                        <when test="key.startsWith('custom_multiple')">
+                            and api_definition.id in (
+                            select api_id from api_definition_custom_field where concat('custom_multiple_', field_id) = #{key}
+                            and
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterMultipleWrapper"/>
+                            )
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                    <if test="condition.name == 'createUser'">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                            <property name="condition" value="condition"/>
+                            <property name="column" value="api_definition.create_user"/>
+                        </include>
+                    </if>
+                    <if test="condition.name == 'follower'">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                            <property name="mainIdColumn" value="api_definition.id"/>
+                            <property name="associationTable" value="api_definition_follower"/>
+                            <property name="associationIdColumn" value="api_definition_id"/>
+                            <property name="searchColumn" value="user_id"/>
+                            <property name="condition" value="condition"/>
+                        </include>
+                    </if>
+                    <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                        <property name="searchMode" value="${combineSearch}.searchMode"/>
+                    </include>
+                </foreach>
+                <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                   <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                       <property name="condition" value="condition"/>
+                       <property name="tablePrefix" value="api_definition"/>
+                   </include>
+                    <if test="condition.name == 'protocol'">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                            <property name="condition" value="condition"/>
+                            <property name="column" value="api_definition.protocol"/>
+                        </include>
+                    </if>
+                    <if test="condition.name == 'status'">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                            <property name="condition" value="condition"/>
+                            <property name="column" value="api_definition.status"/>
+                        </include>
+                    </if>
+                    <if test="condition.name == 'method'">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                            <property name="condition" value="condition"/>
+                            <property name="column" value="api_definition.method"/>
+                        </include>
+                    </if>
+                    <if test="condition.name == 'path'">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                            <property name="condition" value="condition"/>
+                            <property name="column" value="api_definition.path"/>
+                        </include>
+                    </if>
+                    <if test="condition.name == 'belongTestPlan' and condition.operator == 'EQUALS'">
+                        api_definition.id in (
+                        select api.id from api_definition api inner join api_test_case apiCase ON api.id =
+                        apiCase.api_definition_id
+                        WHERE api.deleted IS FALSE and apiCase.deleted IS FALSE and apiCase.id in (
+                        select api_case_id from test_plan_api_case where test_plan_id = #{condition.value}
+                        )
+                        )
+                    </if>
+                    <if test="condition.name == 'caseTotal'">
+                        <choose>
+                            <when test="condition.operator == 'NOT_EMPTY'">
+                                api_definition.id in (
+                                    select api_definition_id from api_test_case where deleted = ${deleted}
+                                    and project_id = '${projectId}'
+                                )
+                            </when>
+                            <when test="condition.operator == 'EMPTY'">
+                                api_definition.id not in (
+                                    select api_definition_id from api_test_case where deleted = ${deleted}
+                                    and project_id = '${projectId}'
+                                )
+                            </when>
+                            <when test="(condition.operator == 'LT' and condition.value &lt; 1) or (condition.operator == 'EQUALS' and condition.value &lt; 0)">
+                                1=2
+                            </when>
+                            <otherwise>
+                                <if test="condition.operator == 'LT' or (condition.operator == 'EQUALS' and condition.value == 0)">
+                                    api_definition.id not in (
+                                        select api_definition_id from api_test_case where deleted = ${deleted}
+                                        and project_id = '${projectId}'
+                                    )
+                                    <if test="condition.value &gt; 1">
+                                        OR
+                                    </if>
+                                </if>
+                                <if test="(condition.operator == 'EQUALS' and condition.value &gt; 0) or (condition.operator == 'LT' and condition.value &gt; 1) or condition.operator == 'GT'">
+                                    api_definition.id in (
+                                        select api_definition_id from api_test_case where deleted = ${deleted}
+                                        and project_id = '${projectId}'
+                                        group by api_definition_id having
+                                        <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                            <property name="condition" value="condition"/>
+                                            <property name="column" value="count(id)"/>
+                                        </include>
+                                    )
+                                </if>
+                            </otherwise>
+                        </choose>
+                    </if>
+                    <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                        <property name="searchMode" value="${combineSearch}.searchMode"/>
+                    </include>
+                </foreach>
+                <include refid="io.metersphere.system.mapper.BaseMapper.customFiledConditions">
+                    <property name="mainIdColumn" value="api_definition.id"/>
+                    <property name="associationTable" value="api_definition_custom_field"/>
+                    <property name="associationIdColumn" value="api_id"/>
+                    <property name="combineSearch" value="${combineSearch}"/>
+                </include>
+            </if>
+            </trim>
+        </trim>
+    </sql>
+
+    <sql id="queryVersionCondition">
+        <if test="request.versionId != null and request.versionId != ''">
+            and ${versionTable}.version_id = #{request.versionId}
+        </if>
+        <if test="request.refId != null and request.refId != ''">
+            and ${versionTable}.ref_id = #{request.refId}
+        </if>
+        <if test="request.versionId == null and request.refId == null and request.id == null">
+            AND ${versionTable}.latest = 1
+        </if>
+    </sql>
+    <sql id="queryDocVersionCondition">
+        <if test="request.versionId != null and request.versionId != ''">
+            and ${versionTable}.version_id = #{request.versionId}
+        </if>
+        <if test="request.versionId == null and request.apiId == null">
+            AND ${versionTable}.latest = 1
+        </if>
+    </sql>
+
+    <sql id="queryWhereConditionByBaseQueryRequest">
+        <include refid="combine">
+            <property name="combineSearch" value="request.condition.combineSearch"/>
+            <property name="projectId" value="${projectId}"/>
+            <property name="deleted" value="${deleted}"/>
+        </include>
+        <if test="request.condition.keyword != null and request.condition.keyword != ''">
+            and (
+            api_definition.num like concat('%', #{request.condition.keyword},'%')
+            or api_definition.name like concat('%', #{request.condition.keyword},'%')
+            or api_definition.tags like concat('%', #{request.condition.keyword},'%')
+            or api_definition.path like concat('%', #{request.condition.keyword},'%')
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+    </sql>
+
+    <select id="selectVersionOptionByIds" resultType="io.metersphere.system.dto.sdk.OptionDTO">
+        select
+            api_definition.id, project_version.name as name
+        from api_definition
+        LEFT JOIN project_version ON project_version.id = api_definition.version_id
+        where api_definition.ref_id in
+        <foreach collection="apiIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectApiDefinitionByVersion" resultType="io.metersphere.api.domain.ApiDefinition">
+        select
+            api_definition.id, api_definition.`name`, api_definition.protocol, api_definition.`method`,
+            api_definition.`path`, api_definition.`status`, api_definition.num, api_definition.tags, api_definition.pos,
+            api_definition.project_id, api_definition.module_id, api_definition.latest, api_definition.version_id,
+            api_definition.ref_id, api_definition.description, api_definition.create_time, api_definition.create_user,
+            api_definition.update_time, api_definition.update_user, api_definition.delete_user, api_definition.delete_time,
+            api_definition.deleted
+        from api_definition
+        where api_definition.ref_id = #{refId} and api_definition.version_id = #{versionId}
+    </select>
+    <select id="getCustomFieldByCaseIds" resultType="io.metersphere.api.domain.ApiDefinitionCustomField">
+        select api_id, field_id, `value` from api_definition_custom_field where api_id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="getIdsByModules" resultType="java.lang.String">
+        select id from api_definition
+        where deleted = false
+        <if test="request.projectId != null and request.projectId != ''">
+            and api_definition.project_id = #{request.projectId}
+        </if>
+        <if test="request.protocols != null and request.protocols.size() > 0">
+            AND api_definition.protocol in
+            <foreach collection="request.protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and api_definition.module_id in
+            <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
+                #{nodeId}
+            </foreach>
+        </if>
+        <if test="request.versionId != null and request.versionId != ''">
+            and api_definition.version_id = #{request.versionId}
+        </if>
+        <if test="request.versionId = null">
+            and api_definition.latest = 1
+        </if>
+
+    </select>
+
+    <select id="getPrePos" resultType="java.lang.Long">
+        select `pos` from api_definition where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &lt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+
+    <select id="getLastPos" resultType="java.lang.Long">
+        select `pos` from api_definition where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &gt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+    <select id="getApiDefinitionExecuteInfo" resultType="io.metersphere.api.dto.ApiDefinitionExecuteInfo">
+        select id as resource_id, module_id, path, method, num
+        from api_definition
+        where protocol = 'HTTP'
+            and id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="selectByProjectNum" resultType="io.metersphere.api.domain.ApiDefinition">
+        select *
+        from api_definition
+        where project_id IN (SELECT id
+                             FROM project
+                             WHERE num = #{projectNum})
+          AND latest = true
+    </select>
+    <select id="selectByProjectNumAndApiNum" resultType="io.metersphere.api.domain.ApiDefinition">
+        select *
+        from api_definition
+        where api_definition.num = #{apiNum}
+          AND project_id IN (SELECT id
+                             FROM project
+                             WHERE num = #{projectNum})
+          AND latest = true
+        limit 1
+    </select>
+    <select id="selectIdByProjectIdOrderByPos" resultType="java.lang.String">
+        SELECT id
+        FROM api_definition
+        WHERE project_id = #{projectId}
+        ORDER BY pos
+    </select>
+    <select id="selectDragInfoById" resultType="io.metersphere.project.dto.DropNode">
+        SELECT id, pos
+        FROM api_definition
+        WHERE id = #{id}
+    </select>
+    <select id="selectNodeByPosOperator"
+            parameterType="io.metersphere.project.dto.NodeSortQueryParam"
+            resultType="io.metersphere.project.dto.DropNode">
+        SELECT id, pos
+        FROM api_definition
+        WHERE project_id = #{parentId}
+        <if test="operator == 'moreThan'">
+            AND pos &gt; #{pos}
+        </if>
+        <if test="operator == 'lessThan'">
+            AND pos &lt; #{pos}
+        </if>
+        ORDER BY pos
+        <if test="operator == 'lessThan' or operator == 'latest'">
+            DESC
+        </if>
+        LIMIT 1
+    </select>
+    <select id="getReference" resultType="io.metersphere.api.dto.ReferenceDTO">
+        select
+            a.id as id,
+            max(a.num) as num,
+            max(a.name) as resource_name,
+            'API' as resourceType,
+            ass.ref_type as refType,
+            max(p.id) as projectId ,
+            max(p.name) as projectName,
+            max(o.id) as organizationId,
+            max(o.name) as organizationName
+        from api_scenario_step ass inner join api_scenario a on ass.scenario_id = a.id
+        inner join project p on p.id = ass.project_id
+        inner join organization o on p.organization_id = o.id
+        <where>
+            ass.resource_id = #{request.resourceId}
+            <if test="request.keyword != null and request.keyword != ''">
+                and (
+                a.num like concat('%', #{request.keyword},'%')
+                or a.name like concat('%', #{request.keyword},'%')
+                )
+            </if>
+        </where>
+        group by a.id, ass.ref_type
+    </select>
+
+
+    <select id="selectApiDefinitionWithBlob" resultMap="ApiResultMap">
+        SELECT
+        api_definition.*,
+	    api_definition_blob.request,
+	    api_definition_blob.response
+        FROM
+	    api_definition
+	    INNER JOIN api_definition_blob ON api_definition.id = api_definition_blob.id
+        where api_definition.id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectAllApi" resultType="io.metersphere.api.domain.ApiDefinition">
+        select
+        api_definition.id,
+        api_definition.name,
+        api_definition.method,
+        api_definition.num,
+        api_definition.project_id,
+        api_definition.version_id,
+        api_definition.protocol,
+        api_definition.pos
+        from api_definition
+        where api_definition.deleted = false
+        and api_definition.project_id = #{projectId}
+        <if test="protocols != null and protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        order by api_definition.pos asc
+    </select>
+
+    <select id="getListBySelectModules" resultType="io.metersphere.api.domain.ApiDefinition">
+        select
+        api_definition.id,
+        api_definition.name,
+        api_definition.method,
+        api_definition.num,
+        api_definition.project_id,
+        api_definition.version_id,
+        api_definition.protocol,
+        api_definition.pos
+        from api_definition
+        where api_definition.deleted = false
+        and api_definition.project_id = #{projectId}
+        and api_definition.module_id in
+        <foreach collection="moduleIds" item="moduleId" open="(" separator="," close=")">
+            #{moduleId}
+        </foreach>
+        <if test="protocols != null and protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getListBySelectIds" resultType="io.metersphere.api.domain.ApiDefinition">
+        select
+        api_definition.id,
+        api_definition.name,
+        api_definition.method,
+        api_definition.num,
+        api_definition.project_id,
+        api_definition.version_id,
+        api_definition.protocol,
+        api_definition.pos
+        from api_definition
+        where api_definition.deleted = false
+        and api_definition.project_id = #{projectId}
+        and api_definition.id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+        <if test="protocols != null and protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getIdsByShareParam" resultType="java.lang.String">
+        select id from api_definition where project_id = #{projectId} and deleted = 0
+        <if test="condition != null and condition != ''">
+            and ${condition}
+        </if>
+    </select>
+    <select id="countByProjectAndId" resultType="java.lang.Long">
+        SELECT count(id)
+        FROM api_definition
+        WHERE project_id = #{projectId}
+          AND id = #{id}
+          AND deleted = false
+    </select>
+    <select id="selectNumById" resultType="java.lang.Long">
+        select num
+        from api_definition
+        where id = #{0}
+    </select>
+
+    <select id="projectApiCount"
+            resultType="io.metersphere.project.dto.ProjectCountDTO">
+        SELECT api_definition.project_id as projectId, count(api_definition.id) as count
+        FROM api_definition
+        WHERE api_definition.project_id IN
+        <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+            #{projectId}
+        </foreach>
+        AND api_definition.deleted = false
+        <if test="startTime != null and endTime != null">
+            AND api_definition.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="userId != null and userId != ''">
+            AND api_definition.create_user = #{userId}
+        </if>
+        group by api_definition.project_id;
+    </select>
+
+    <select id="userCreateApiCount"
+            resultType="io.metersphere.project.dto.ProjectUserCreateCount">
+        SELECT api_definition.create_user as userId, count(api_definition.id) as count
+        FROM api_definition
+        WHERE api_definition.deleted = false
+        AND api_definition.project_id =  #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND api_definition.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="userIds != null and userIds.size() > 0">
+            and api_definition.create_user in
+            <foreach collection="userIds" item="userId" separator="," open="(" close=")">
+                #{userId}
+            </foreach>
+        </if>
+        group by api_definition.create_user;
+    </select>
+
+    <select id="getUpdateApiList" resultType="io.metersphere.api.dto.definition.ApiDefinitionUpdateDTO">
+        SELECT api_definition.id, api_definition.name, api_definition.num, api_definition.path, api_definition.update_time
+        FROM api_definition
+        WHERE api_definition.deleted = false
+        AND api_definition.project_id =  #{projectId}
+        AND api_definition.update_time BETWEEN #{startTime} AND #{endTime}
+        AND api_definition.update_time > api_definition.create_time
+        order by api_definition.update_time desc
+    </select>
+
+    <select id="scenarioRefApiCount" resultType="io.metersphere.api.dto.definition.ApiRefSourceCountDTO">
+        select
+        ass.resource_id as sourceId, COUNT(DISTINCT ass.scenario_id) as count
+        from api_scenario_step ass
+        where ass.step_type = 'API'
+          and ass.project_id = #{projectId}
+          and ass.ref_type='REF'
+          and ass.resource_id in
+              <foreach collection="resourceIds" item="resourceId" separator="," open="(" close=")">
+                #{resourceId}
+            </foreach>
+        group by ass.resource_id;
+    </select>
+    <select id="getCreateApiList" resultType="io.metersphere.api.domain.ApiDefinition">
+        SELECT api_definition.id, api_definition.protocol, api_definition.status
+        FROM api_definition
+        WHERE api_definition.deleted = false
+          AND api_definition.project_id = #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND api_definition.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+    </select>
+    <select id="selectBaseInfoByProjectId" resultType="io.metersphere.api.domain.ApiDefinition">
+        SELECT id, path, method, protocol
+        FROM api_definition
+        WHERE project_id = #{projectId}
+          AND deleted IS FALSE
+        <if test="protocols != null and protocols.size() > 0">
+            AND protocol IN
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <if test="ignoreApiIds!= null and ignoreApiIds.size > 0">
+            AND id NOT IN
+            <foreach collection="ignoreApiIds" item="ignoreApiId" open="(" separator="," close=")">
+                #{ignoreApiId}
+            </foreach>
+        </if>
+    </select>
+</mapper>

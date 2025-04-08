@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.PluginScriptMapper">
+  <resultMap id="BaseResultMap" type="io.metersphere.system.domain.PluginScript">
+    <id column="plugin_id" jdbcType="VARCHAR" property="pluginId" />
+    <id column="script_id" jdbcType="VARCHAR" property="scriptId" />
+    <result column="name" jdbcType="VARCHAR" property="name" />
+  </resultMap>
+  <resultMap extends="BaseResultMap" id="ResultMapWithBLOBs" type="io.metersphere.system.domain.PluginScript">
+    <result column="script" jdbcType="LONGVARBINARY" property="script" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    plugin_id, script_id, `name`
+  </sql>
+  <sql id="Blob_Column_List">
+    script
+  </sql>
+  <select id="selectByExampleWithBLOBs" parameterType="io.metersphere.system.domain.PluginScriptExample" resultMap="ResultMapWithBLOBs">
+    select
+    <if test="distinct">
+      distinct
+    </if>
+    <include refid="Base_Column_List" />
+    ,
+    <include refid="Blob_Column_List" />
+    from plugin_script
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByExample" parameterType="io.metersphere.system.domain.PluginScriptExample" resultMap="BaseResultMap">
+    select
+    <if test="distinct">
+      distinct
+    </if>
+    <include refid="Base_Column_List" />
+    from plugin_script
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="map" resultMap="ResultMapWithBLOBs">
+    select 
+    <include refid="Base_Column_List" />
+    ,
+    <include refid="Blob_Column_List" />
+    from plugin_script
+    where plugin_id = #{pluginId,jdbcType=VARCHAR}
+      and script_id = #{scriptId,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="map">
+    delete from plugin_script
+    where plugin_id = #{pluginId,jdbcType=VARCHAR}
+      and script_id = #{scriptId,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="io.metersphere.system.domain.PluginScriptExample">
+    delete from plugin_script
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="io.metersphere.system.domain.PluginScript">
+    insert into plugin_script (plugin_id, script_id, `name`, 
+      script)
+    values (#{pluginId,jdbcType=VARCHAR}, #{scriptId,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
+      #{script,jdbcType=LONGVARBINARY})
+  </insert>
+  <insert id="insertSelective" parameterType="io.metersphere.system.domain.PluginScript">
+    insert into plugin_script
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="pluginId != null">
+        plugin_id,
+      </if>
+      <if test="scriptId != null">
+        script_id,
+      </if>
+      <if test="name != null">
+        `name`,
+      </if>
+      <if test="script != null">
+        script,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="pluginId != null">
+        #{pluginId,jdbcType=VARCHAR},
+      </if>
+      <if test="scriptId != null">
+        #{scriptId,jdbcType=VARCHAR},
+      </if>
+      <if test="name != null">
+        #{name,jdbcType=VARCHAR},
+      </if>
+      <if test="script != null">
+        #{script,jdbcType=LONGVARBINARY},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="io.metersphere.system.domain.PluginScriptExample" resultType="java.lang.Long">
+    select count(*) from plugin_script
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update plugin_script
+    <set>
+      <if test="record.pluginId != null">
+        plugin_id = #{record.pluginId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.scriptId != null">
+        script_id = #{record.scriptId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.name != null">
+        `name` = #{record.name,jdbcType=VARCHAR},
+      </if>
+      <if test="record.script != null">
+        script = #{record.script,jdbcType=LONGVARBINARY},
+      </if>
+    </set>
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExampleWithBLOBs" parameterType="map">
+    update plugin_script
+    set plugin_id = #{record.pluginId,jdbcType=VARCHAR},
+      script_id = #{record.scriptId,jdbcType=VARCHAR},
+      `name` = #{record.name,jdbcType=VARCHAR},
+      script = #{record.script,jdbcType=LONGVARBINARY}
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update plugin_script
+    set plugin_id = #{record.pluginId,jdbcType=VARCHAR},
+      script_id = #{record.scriptId,jdbcType=VARCHAR},
+      `name` = #{record.name,jdbcType=VARCHAR}
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="io.metersphere.system.domain.PluginScript">
+    update plugin_script
+    <set>
+      <if test="name != null">
+        `name` = #{name,jdbcType=VARCHAR},
+      </if>
+      <if test="script != null">
+        script = #{script,jdbcType=LONGVARBINARY},
+      </if>
+    </set>
+    where plugin_id = #{pluginId,jdbcType=VARCHAR}
+      and script_id = #{scriptId,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKeyWithBLOBs" parameterType="io.metersphere.system.domain.PluginScript">
+    update plugin_script
+    set `name` = #{name,jdbcType=VARCHAR},
+      script = #{script,jdbcType=LONGVARBINARY}
+    where plugin_id = #{pluginId,jdbcType=VARCHAR}
+      and script_id = #{scriptId,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="io.metersphere.system.domain.PluginScript">
+    update plugin_script
+    set `name` = #{name,jdbcType=VARCHAR}
+    where plugin_id = #{pluginId,jdbcType=VARCHAR}
+      and script_id = #{scriptId,jdbcType=VARCHAR}
+  </update>
+  <insert id="batchInsert" parameterType="map">
+    insert into plugin_script
+    (plugin_id, script_id, `name`, script)
+    values
+    <foreach collection="list" item="item" separator=",">
+      (#{item.pluginId,jdbcType=VARCHAR}, #{item.scriptId,jdbcType=VARCHAR}, #{item.name,jdbcType=VARCHAR}, 
+        #{item.script,jdbcType=LONGVARBINARY})
+    </foreach>
+  </insert>
+  <insert id="batchInsertSelective" parameterType="map">
+    insert into plugin_script (
+    <foreach collection="selective" item="column" separator=",">
+      ${column.escapedColumnName}
+    </foreach>
+    )
+    values
+    <foreach collection="list" item="item" separator=",">
+      (
+      <foreach collection="selective" item="column" separator=",">
+        <if test="'plugin_id'.toString() == column.value">
+          #{item.pluginId,jdbcType=VARCHAR}
+        </if>
+        <if test="'script_id'.toString() == column.value">
+          #{item.scriptId,jdbcType=VARCHAR}
+        </if>
+        <if test="'name'.toString() == column.value">
+          #{item.name,jdbcType=VARCHAR}
+        </if>
+        <if test="'script'.toString() == column.value">
+          #{item.script,jdbcType=LONGVARBINARY}
+        </if>
+      </foreach>
+      )
+    </foreach>
+  </insert>
+</mapper>

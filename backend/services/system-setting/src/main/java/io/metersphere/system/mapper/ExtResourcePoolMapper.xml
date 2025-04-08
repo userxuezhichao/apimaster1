@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.ExtResourcePoolMapper">
+
+    <select id="getResourcePoolList" resultType="io.metersphere.system.domain.TestResourcePool">
+        SELECT *
+        FROM test_resource_pool t
+        <include refid="queryWhereCondition"/>
+        order by t.update_time desc
+    </select>
+
+    <sql id="queryWhereCondition">
+        <where>
+            <if test="request.keyword != null">
+                and t.name like concat('%', #{request.keyword},'%')
+            </if>
+            <if test="request.enable != null">
+                and t.enable = #{request.enable}
+            </if>
+            <if test="request.deleted != null">
+                and t.deleted = #{request.deleted}
+            </if>
+            <include refid="filter"/>
+            <include refid="combine">
+                <property name="condition" value="request.combine"/>
+            </include>
+        </where>
+    </sql>
+
+    <sql id="filter">
+        <if test="request.filter != null and request.filter.size() > 0">
+            <foreach collection="request.filter.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='createUser'">
+                            and t.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='type'">
+                            and t.type in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='orgId'">
+                            and t.id in (
+                            select tpo.test_resource_pool_id from test_resource_pool_organization tpo where tpo.org_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="combine">
+        <if test="request.combine != null">
+            <if test='${condition}.createUser != null'>
+                and t.create_user
+                <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                    <property name="object" value="${condition}.createUser"/>
+                </include>
+            </if>
+        </if>
+    </sql>
+
+
+
+    <select id="selectAllResourcePool" resultType="io.metersphere.system.domain.TestResourcePool">
+        SELECT id, name
+        FROM test_resource_pool
+        where deleted = false
+        <if test="poolIds != null and poolIds.size() > 0 ">
+            and (
+                all_org = true or id in
+                <foreach collection="poolIds" item="poolId" open="(" separator="," close=")">
+                    #{poolId}
+                </foreach>
+            )
+        </if>
+        <if test="poolIds == null or poolIds.size() == 0">
+            and all_org = true
+        </if>
+    </select>
+
+
+    <select id="selectProjectAllResourcePool" resultType="io.metersphere.system.domain.TestResourcePool">
+        SELECT id, name
+        FROM test_resource_pool
+        where deleted = false and id in
+        <foreach collection="poolIds" item="poolId" open="(" separator="," close=")">
+            #{poolId}
+        </foreach>
+    </select>
+
+</mapper>

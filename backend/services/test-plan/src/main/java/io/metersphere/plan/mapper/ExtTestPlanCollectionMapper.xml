@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.plan.mapper.ExtTestPlanCollectionMapper">
+
+    <select id="getList" resultType="io.metersphere.plan.dto.TestPlanCollectionConfigDTO">
+        SELECT
+        tpc.id, tpc.test_plan_id, tpc.parent_id,
+        tpc.`name`, tpc.`type`, tpc.execute_method,
+        tpc.extended, tpc.grouped, tpc.environment_id,
+        tpc.test_resource_pool_id, tpc.retry_on_fail,
+        tpc.retry_times, tpc.retry_interval, tpc.stop_on_fail,
+        tpc.create_user, tpc.create_time, tpc.pos,
+        IF(env.name is not null, env.name, envg.name) as envName
+        FROM
+        test_plan_collection tpc
+        LEFT JOIN environment env ON tpc.environment_id = env.id
+        LEFT JOIN environment_group envg ON tpc.environment_id = envg.id
+        WHERE tpc.test_plan_id = #{planId}
+    </select>
+
+    <select id="selectSecondCollectionEnv" resultType="io.metersphere.plan.dto.TestPlanCollectionEnvDTO">
+        SELECT
+            tpc.id,
+            tpc.environment_id,
+            e.`name` as environmentName,
+            tpc.parent_id,
+            tpc.extended
+        FROM
+            test_plan_collection tpc
+                LEFT JOIN environment e ON tpc.environment_id = e.id
+        WHERE
+            tpc.type = #{type}
+          and tpc.parent_id <![CDATA[<>]]> #{parentId}
+        and tpc.test_plan_id = #{testPlanId}
+    </select>
+
+
+    <select id="selectFirstCollectionEnv" resultType="io.metersphere.plan.dto.TestPlanCollectionEnvDTO">
+        SELECT
+            tpc.id,
+            tpc.environment_id,
+            e.`name` as environmentName,
+            tpc.parent_id,
+            tpc.extended
+        FROM
+            test_plan_collection tpc
+                LEFT JOIN environment e ON tpc.environment_id = e.id
+        WHERE
+            tpc.type = #{type}
+          and tpc.parent_id = #{parentId}
+          and tpc.test_plan_id = #{testPlanId}
+    </select>
+    <select id="selectDefaultCollectionId" resultType="java.lang.String">
+        SELECT id
+        FROM test_plan_collection
+        WHERE test_plan_id = #{testPlanId}
+          AND parent_id != 'NONE'
+          and type = #{type}
+        ORDER BY pos
+        limit 1
+    </select>
+    <select id="getParentStopOnFailure" resultType="java.lang.Boolean">
+        select stop_on_fail
+        from test_plan_collection
+        where id IN (select parent_id from test_plan_collection where id = #{0})
+    </select>
+    <select id="selectByItemParentId" resultType="io.metersphere.plan.domain.TestPlanCollection">
+        select *
+        from test_plan_collection
+        where parent_id = (select parent_id from test_plan_collection where id = #{0})
+        ORDER BY pos
+    </select>
+</mapper>

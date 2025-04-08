@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.functional.mapper.ExtFunctionalCaseTestMapper">
+
+    <select id="getIds" resultType="java.lang.String">
+        SELECT
+        id
+        FROM
+        functional_case_test
+        where functional_case_test.case_id = #{request.caseId}
+        <choose>
+            <when test='request.condition.searchMode == "AND"'>
+                AND <include refid="queryWhereConditionByBaseQueryRequest"/>
+            </when>
+            <when test='request.condition.searchMode == "OR"'>
+                and (
+                <include refid="queryWhereConditionByBaseQueryRequest"/>
+                )
+            </when>
+        </choose>
+        1 = 1
+    </select>
+
+    <select id="getList" parameterType="io.metersphere.functional.request.FunctionalCaseTestRequest" resultType="io.metersphere.functional.dto.FunctionalCaseTestDTO">
+        SELECT
+        fct.id,
+        fct.case_id,
+        fct.source_id,
+        fct.source_type,
+        fct.project_id,
+        fct.version_id,
+        fct.create_time,
+        p.name as projectName,
+        v.name as versionName,
+        IF(atc.name is not null, atc.name, scenario.name) as sourceName,
+        IF(atc.num is not null, atc.num, scenario.num) as sourceNum
+        FROM
+        functional_case_test fct
+        LEFT JOIN project p ON fct.project_id = p.id
+        LEFT JOIN project_version v ON fct.version_id = v.id
+        LEFT JOIN api_test_case atc ON fct.source_id = atc.id
+        LEFT JOIN api_scenario scenario ON fct.source_id = scenario.id
+        WHERE fct.case_id = #{request.sourceId}
+        AND (
+        atc.deleted = false
+        OR scenario.deleted = false
+        )
+        <if test="request.sourceType != null and request.sourceType != ''">
+            AND fct.source_type = #{request.sourceType}
+        </if>
+        <if test="request.projectId != null and request.projectId != ''">
+            AND fct.project_id = #{request.projectId}
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            atc.name like concat('%', #{request.keyword},'%')
+            or scenario.name like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        order by fct.create_time desc
+    </select>
+
+    <select id="getOtherCaseCount" resultType="java.lang.Integer">
+        SELECT
+        count(fct.id)
+        FROM
+        functional_case_test fct
+        LEFT JOIN project p ON fct.project_id = p.id
+        LEFT JOIN project_version v ON fct.version_id = v.id
+        LEFT JOIN api_test_case atc ON fct.source_id = atc.id
+        LEFT JOIN api_scenario scenario ON fct.source_id = scenario.id
+        WHERE fct.case_id = #{caseId}
+        AND (
+        atc.deleted = false
+        OR scenario.deleted = false
+        )
+    </select>
+
+    <select id="getPlanList" parameterType="io.metersphere.functional.request.AssociatePlanPageRequest" resultType="io.metersphere.functional.dto.FunctionalCaseTestPlanDTO">
+        SELECT r.* from (
+        SELECT distinct tpfc.test_plan_id as testPlanId,
+        tpfc.*, tp.name as testPlanName, tp.num as testPlanNum, tp.status as planStatus, p.name as projectName
+        FROM
+        test_plan_functional_case tpfc
+        LEFT JOIN test_plan tp ON tpfc.test_plan_id = tp.id
+        LEFT JOIN project p ON tp.project_id = p.id
+        <where>
+            tpfc.functional_case_id = #{request.caseId}
+
+            <if test="request.keyword != null">
+                AND
+                (
+                tp.name LIKE concat('%', #{request.keyword},'%')
+                OR tp.num LIKE concat('%', #{request.keyword},'%')
+                )
+            </if>
+            <include refid="planFilters">
+                <property name="filter" value="request.filter"/>
+            </include>
+        </where>
+
+        order by tpfc.last_exec_time desc) as r
+        group by r.test_plan_id
+    </select>
+
+    <select id="getPlanExecuteHistoryList" resultType="io.metersphere.functional.dto.TestPlanCaseExecuteHistoryDTO">
+        SELECT
+        tpceh.id,
+        tpceh.test_plan_case_id,
+        tpceh.case_id,
+        tpceh.status,
+        tpceh.notifier,
+        tpceh.create_user,
+        tpceh.create_time,
+        tpceh.content,
+        tpceh.deleted,
+        tpceh.steps,
+        u.name as userName,
+        ux.avatar as userLogo,
+        tp.name as testPlanName,
+        tp.id as testPlanId,
+        u.email as email,
+        functional_case.case_edit_type as caseEditType
+        FROM
+        test_plan_case_execute_history tpceh
+        left join functional_case on tpceh.case_id = functional_case.id
+        left join user u on  tpceh.create_user = u.id
+        left join user_extend ux on  tpceh.create_user = ux.id
+        left join test_plan tp on  tpceh.test_plan_id = tp.id
+        where tpceh.case_id = #{caseId}
+        <if test="planId != null and planId != ''">
+            and tpceh.test_plan_case_id = #{planId}
+        </if>
+        order by tpceh.create_time desc
+    </select>
+
+    <sql id="queryWhereConditionByBaseQueryRequest">
+        <if test="request.condition.keyword != null and request.sourceType == 'API'">
+            functional_case_test.source_id not in
+            (
+            select api_test_case.id from api_test_case where api_test_case.name like concat('%', #{request.keyword},'%')
+            )
+            <include refid="queryType">
+                <property name="searchMode" value="request.condition.searchMode"/>
+            </include>
+        </if>
+        <if test="request.condition.keyword != null and request.sourceType == 'SCENARIO'">
+            functional_case_test.source_id not in
+            (
+            select api_scenario.id from api_scenario where api_scenario.name like concat('%', #{request.keyword},'%')
+            )
+            <include refid="queryType">
+                <property name="searchMode" value="request.condition.searchMode"/>
+            </include>
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+    </sql>
+
+    <sql id="queryType">
+        <choose>
+            <when test='${searchMode} == "AND"'>
+                AND
+            </when>
+            <when test='${searchMode} == "OR"'>
+                OR
+            </when>
+        </choose>
+    </sql>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='project_id'">
+                            functional_case_test.project_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            <include refid="queryType">
+                                <property name="searchMode" value="request.searchMode"/>
+                            </include>
+                        </when>
+                        <when test="key=='source_type'">
+                            functional_case_test.source_type in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            <include refid="queryType">
+                                <property name="searchMode" value="request.searchMode"/>
+                            </include>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="planFilters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='planStatus'">
+                            AND
+                            (
+                            tp.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+
+                            <if test="request.includeTestPlanIds != null and request.includeTestPlanIds.size() > 0 ">
+                                OR tpfc.test_plan_id in
+                                <foreach collection="request.includeTestPlanIds" item="testPlanId" open="(" close=")"
+                                         separator=",">
+                                    #{testPlanId}
+                                </foreach>
+                            </if>
+                            )
+                        </when>
+                        <when test="key=='lastExecResult'">
+                            AND tpfc.last_exec_result in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+
+    <select id="selectApiCaseByCaseIds" resultType="io.metersphere.api.domain.ApiTestCase">
+        SELECT
+            api_test_case.id,
+            api_test_case.create_user,
+            api_test_case.environment_id
+        FROM
+            api_test_case
+                INNER JOIN functional_case_test ON api_test_case.id = functional_case_test.source_id
+        WHERE
+            api_test_case.deleted = FALSE
+        <if test="caseIds != null and caseIds.size() > 0">
+            AND functional_case_test.case_id in
+            <foreach collection="caseIds" item="caseId" open="(" close=")" separator=",">
+            #{caseId}
+            </foreach>
+        </if>
+        <if test="!isRepeat">
+            AND api_test_case.id not in (
+            select api_case_id from test_plan_api_case where test_plan_id = #{testPlanId}
+            )
+        </if>
+    </select>
+
+
+    <select id="selectApiScenarioByCaseIds" resultType="io.metersphere.api.domain.ApiScenario">
+        SELECT
+        api_scenario.id,
+        api_scenario.create_user,
+        api_scenario.environment_id,
+        api_scenario.grouped
+        FROM
+        api_scenario
+        INNER JOIN functional_case_test ON api_scenario.id = functional_case_test.source_id
+        WHERE
+        api_scenario.deleted = FALSE
+        <if test="caseIds != null and caseIds.size() > 0">
+            AND functional_case_test.case_id in
+            <foreach collection="caseIds" item="caseId" open="(" close=")" separator=",">
+                #{caseId}
+            </foreach>
+        </if>
+        <if test="!isRepeat">
+            AND api_scenario.id not in (
+            select api_scenario_id from test_plan_api_scenario where test_plan_id = #{testPlanId}
+            )
+        </if>
+    </select>
+    <select id="selectApiAndScenarioIdsFromCaseIds"
+            resultType="io.metersphere.functional.domain.FunctionalCaseTest">
+        select case_id, source_id from functional_case_test where case_id in
+        <foreach collection="caseIds" item="caseId" open="(" close=")" separator=",">
+            #{caseId}
+        </foreach>
+        AND source_type in ('API','SCENARIO')
+    </select>
+</mapper>

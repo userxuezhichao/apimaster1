@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.project.mapper.ExtProjectMemberMapper">
+    <select id="listMember" resultType="java.lang.String">
+        select distinct t.id FROM (
+        SELECT u.id AS id,urr.create_time from user_role_relation urr
+        join `user` u on urr.user_id = u.id
+        <where>
+            urr.source_id = #{request.projectId} and u.deleted = 0
+            <if test="request.keyword != null and request.keyword != ''">
+                and (u.name like CONCAT('%', #{request.keyword},'%')
+                or u.email like CONCAT('%', #{request.keyword},'%')
+                or u.phone like CONCAT('%', #{request.keyword},'%'))
+            </if>
+            <include refid="filter"/>
+        </where>
+        order by urr.create_time desc
+        ) t
+    </select>
+
+    <select id="getMemberByOrg" resultType="io.metersphere.system.dto.user.UserExtendDTO">
+        select distinct u.* from user_role_relation urr join `user` u on urr.user_id = u.id
+        where
+            u.deleted = 0
+            <if test="organizationId != null and organizationId != ''">
+                and urr.source_id = #{organizationId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                and (u.name like concat('%', #{keyword}, '%') or u.email like concat('%', #{keyword}, '%'))
+            </if>
+        order by u.name
+        limit 1000
+    </select>
+
+    <select id="getCommentAtUserInfoByParam" resultType="io.metersphere.system.dto.CommentUserInfo">
+        <!-- avatar: 保留; 用户头像参数暂时为空, 后续调整为user_extend参数 -->
+        <!-- 评论@通知人过滤条件暂为根据用户名字, 且限制100条 -->
+        select distinct u.*, '' as avatar
+        from user_role_relation urr
+        join `user` u on urr.user_id = u.id
+        left join user_extend ue on u.id = ue.id
+        where urr.source_id = #{projectId}
+        <if test="keyword != null and keyword != ''">
+            and u.name like concat('%', #{keyword}, '%')
+        </if>
+        limit 1000
+    </select>
+
+    <sql id="filter">
+        <if test="request.filter != null">
+            <foreach collection="request.filter.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key == 'roleIds'">
+                            and urr.role_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="getOrgProjectMemberList" resultType="io.metersphere.system.dto.user.ProjectUserMemberDTO">
+        SELECT distinct u.id AS id,urr.source_id from user_role_relation urr
+        join `user` u on urr.user_id = u.id where
+        urr.source_id in (select p.id from project  p where p.organization_id = #{organizationId} and p.enable = 1 and p.deleted = 0 ) and u.deleted = 0 and u.enable = 1
+        <if test="userIds != null and userIds.size() > 0">
+            and u.id in
+            <foreach collection="userIds" item="userId" separator="," open="(" close=")">
+                #{userId}
+            </foreach>
+        </if>
+        order by urr.create_time desc
+    </select>
+
+    <select id="getProjectMemberList" resultType="io.metersphere.system.dto.user.ProjectUserMemberDTO">
+        SELECT distinct u.id, urr.source_id AS projectId, u.name from user_role_relation urr
+        join `user` u on urr.user_id = u.id where
+        urr.source_id = #{projectId} and u.deleted = 0 and u.enable = 1
+        <if test="userIds != null and userIds.size() > 0">
+            and u.id in
+            <foreach collection="userIds" item="userId" separator="," open="(" close=")">
+                #{userId}
+            </foreach>
+        </if>
+        order by urr.create_time desc
+    </select>
+
+</mapper>

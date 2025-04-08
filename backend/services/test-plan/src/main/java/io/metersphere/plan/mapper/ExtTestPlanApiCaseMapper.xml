@@ -1,0 +1,979 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.plan.mapper.ExtTestPlanApiCaseMapper">
+
+    <resultMap id="ApiDefinitionDTO" type="io.metersphere.api.dto.definition.ApiDefinitionDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler"/>
+    </resultMap>
+
+    <update id="updatePos">
+        UPDATE
+            test_plan_api_case
+        SET pos =#{pos}
+        WHERE id = #{id}
+    </update>
+    <select id="selectIdByTestPlanIdOrderByPos" resultType="java.lang.String">
+        SELECT id
+        FROM test_plan_api_case
+        WHERE test_plan_id = #{testPlanId}
+        ORDER BY pos ASC
+    </select>
+    <select id="getMaxPosByTestPlanId" resultType="java.lang.Long">
+        SELECT max(pos)
+        FROM test_plan_api_case
+        WHERE test_plan_id = #{0}
+    </select>
+
+    <select id="getIdByParam"
+            parameterType="io.metersphere.plan.dto.ResourceSelectParam"
+            resultType="java.lang.String">
+        SELECT id
+        FROM api_test_case
+        WHERE deleted = false
+        <if test="selectIds != null and selectIds.size() != 0">
+            AND id IN
+            <foreach collection="selectIds" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="moduleIds != null and moduleIds.size() != 0">
+            AND module_id IN
+            <foreach collection="moduleIds" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        <if test="repeatCase == false">
+            AND id NOT IN
+            (SELECT api_case_id FROM test_plan_api_case WHERE test_plan_id = #{testPlanId})
+        </if>
+        <if test="orderString != null ">
+            ORDER BY #{orderString}
+        </if>
+    </select>
+
+    <select id="selectDragInfoById" resultType="io.metersphere.project.dto.DropNode">
+        SELECT id, pos
+        FROM test_plan_api_case
+        WHERE id = #{0}
+    </select>
+    <select id="selectNodeByPosOperator"
+            parameterType="io.metersphere.project.dto.NodeSortQueryParam"
+            resultType="io.metersphere.project.dto.DropNode">
+        SELECT id, pos
+        FROM test_plan_api_case
+        WHERE test_plan_collection_id = #{parentId}
+        <if test="operator == 'moreThan'">
+            AND pos &gt; #{pos}
+        </if>
+        <if test="operator == 'lessThan'">
+            AND pos &lt; #{pos}
+        </if>
+        ORDER BY pos
+        <if test="operator == 'lessThan' or operator == 'latest'">
+            DESC
+        </if>
+        LIMIT 1
+    </select>
+    <select id="selectCaseExecResultCount" resultType="io.metersphere.plan.dto.TestPlanCaseRunResultCount">
+        select test_plan_api_case.last_exec_result as result, count(test_plan_api_case.id) as resultCount
+        from test_plan_api_case
+                 inner join api_test_case on test_plan_api_case.api_case_id = api_test_case.id
+        where test_plan_id = #{0}
+          and api_test_case.deleted = false
+        group by last_exec_result
+    </select>
+
+    <select id="list" resultMap="ApiDefinitionDTO">
+        select a.id, a.`name`, a.protocol, a.`method`, a.`path`, a.`status`, a.num, a.tags, a.pos,
+        a.project_id, a.module_id, a.latest, a.version_id, a.ref_id, a.description,
+        a.create_time, a.create_user, a.update_time, a.update_user, a.delete_user, a.delete_time, a.deleted,
+        project_version.name as version_name
+        from api_definition  a left join project_version on project_version.id = a.version_id
+        where a.deleted = false
+        <include refid="queryWhereApiDefinitionCondition"/>
+        and exists (
+            select id
+            from api_test_case atc
+            where atc.api_definition_id = a.id and atc.deleted = false
+            <if test="!isRepeat">
+                and not exists (
+                select id
+                from test_plan_api_case t
+                where t.api_case_id = atc.id
+                and t.test_plan_id = #{request.testPlanId}
+                )
+            </if>
+        )
+    </select>
+
+
+    <sql id="queryWhereApiDefinitionCondition">
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and a.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" separator="," open="(" close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            a.name like concat('%', #{request.keyword},'%')
+                or a.num like concat('%', #{request.keyword},'%')
+                or a.path like concat('%', #{request.keyword},'%')
+                or a.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <if test="request.projectId != null and request.projectId != ''">
+            and a.project_id = #{request.projectId}
+        </if>
+        <if test="request.protocols != null and request.protocols.size() > 0">
+            and a.protocol in
+            <foreach collection="request.protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.filter"/>
+        </include>
+
+        <include refid="queryApiDefinitionCombine">
+            <property name="combineSearch" value="request.combineSearch"/>
+            <property name="projectId" value="${request.projectId}"/>
+            <property name="deleted" value="${request.deleted}"/>
+        </include>
+
+        <include refid="queryVersionCondition">
+            <property name="versionTable" value="a"/>
+        </include>
+    </sql>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='status'">
+                            and a.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='method'">
+                            and a.method in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='createUser'">
+                            and a.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='versionId'">
+                            and a.version_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='deleteUser'">
+                            and a.delete_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key.startsWith('custom_single')">
+                            and a.id in (
+                            select api_id from api_definition_custom_field where concat('custom_single_', field_id) =
+                            #{key}
+                            and trim(both '"' from `value`) in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                        <when test="key.startsWith('custom_multiple')">
+                            and a.id in (
+                            select api_id from api_definition_custom_field where concat('custom_multiple_', field_id) =
+                            #{key}
+                            and JSON_CONTAINS(`value`, json_array(#{value}))
+                            )
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="queryVersionCondition">
+        <choose>
+            <when test="request.versionId != null and request.versionId != ''">
+                and ${versionTable}.version_id = #{request.versionId}
+            </when>
+            <when test="request.refId != null and request.refId != ''">
+                and ${versionTable}.ref_id = #{request.refId}
+            </when>
+            <otherwise>
+                and ${versionTable}.latest = 1
+            </otherwise>
+        </choose>
+    </sql>
+
+
+    <select id="relateApiCaseList" resultType="io.metersphere.plan.dto.response.TestPlanApiCasePageResponse">
+        SELECT
+        t.id,
+        t.test_plan_collection_id,
+        atc.num,
+        atc.name,
+        atc.priority,
+        atc.project_id,
+        atc.api_definition_id,
+        atc.create_user,
+        atc.create_time,
+        atc.update_time,
+        t.environment_id,
+        a.module_id,
+        a.path,
+        a.method,
+        a.protocol,
+        t.last_exec_result,
+        t.execute_user,
+        t.last_exec_time,
+        t.last_exec_report_id,
+        atc.status,
+        atc.id as apiTestCaseId,
+        test_plan_collection.name as testPlanCollectionName
+        FROM
+        api_test_case atc
+        INNER JOIN api_definition a ON atc.api_definition_id = a.id
+        inner join test_plan_api_case t on atc.id = t.api_case_id
+        inner join test_plan_collection on test_plan_collection.id = t.test_plan_collection_id
+        WHERE atc.deleted =#{deleted}
+        and t.test_plan_id = #{request.testPlanId}
+        <include refid="queryApiCaseWhereCondition"/>
+    </select>
+    <select id="selectByTestPlanIdAndNotDeleted" resultType="io.metersphere.plan.domain.TestPlanApiCase">
+        SELECT t.*
+        FROM test_plan_api_case t
+                 INNER JOIN api_test_case atc ON t.api_case_id = atc.id
+        WHERE t.test_plan_id = #{0}
+          AND atc.deleted = false
+    </select>
+
+    <select id="getPlanApiCaseNotDeletedByCollectionIds" resultType="io.metersphere.plan.domain.TestPlanApiCase">
+        SELECT t.*
+        FROM test_plan_api_case t
+        INNER JOIN api_test_case atc ON t.api_case_id = atc.id
+        WHERE t.test_plan_collection_id IN
+        <foreach collection="collectionIds" item="collectionId" separator="," open="(" close=")">
+            #{collectionId}
+        </foreach>
+        AND atc.deleted = false
+    </select>
+
+
+    <sql id="queryApiCaseWhereCondition">
+        <if test="request.protocols != null and request.protocols.size() > 0">
+            and a.protocol in
+            <foreach collection="request.protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <if test="request.apiDefinitionId != null and request.apiDefinitionId!=''">
+            and atc.api_definition_id = #{request.apiDefinitionId}
+        </if>
+        <if test="request.projectId != null and request.projectId!=''">
+            and atc.project_id = #{request.projectId}
+        </if>
+        <if test="request.keyword != null and request.keyword !=''">
+            and (
+            atc.name like concat('%', #{request.keyword},'%')
+            or atc.num like concat('%', #{request.keyword},'%')
+            or a.path like concat('%', #{request.keyword},'%')
+            or atc.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and a.module_id in
+            <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
+                <choose>
+                    <when test="nodeId.contains('_root')">
+                        'root'
+                    </when>
+                    <otherwise>
+                        #{nodeId}
+                    </otherwise>
+                </choose>
+            </foreach>
+        </if>
+        <if test="request.collectionId != null and request.collectionId != ''">
+            and t.test_plan_collection_id = #{request.collectionId}
+        </if>
+        <include refid="apiCaseFilters">
+            <property name="filter" value="request.filter"/>
+            <property name="nullExecutorKey" value="request.nullExecutorKey"/>
+        </include>
+
+        <include refid="combine">
+            <property name="combineSearch" value="request.combineSearch"/>
+            <property name="planId" value="${request.testPlanId}"/>
+        </include>
+
+        <include refid="queryApiCaseVersionCondition">
+            <property name="versionTable" value="atc"/>
+        </include>
+    </sql>
+
+    <sql id="apiCaseFilters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="(values != null and values.size() > 0) or key == 'executeUserName'">
+                    <choose>
+                        <when test="key == 'priority'">
+                            and atc.priority in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='status'">
+                            and atc.status in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='lastExecResult'">
+                            and t.last_exec_result in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='lastReportStatus'">
+                            and atc.last_report_status in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='createUser'">
+                            and atc.create_user in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                (#{value})
+                            </foreach>
+                        </when>
+                        <when test="key=='updateUser'">
+                            and atc.update_user in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                (#{value})
+                            </foreach>
+                        </when>
+                        <when test="key=='deleteUser'">
+                            and atc.delete_user in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                (#{value})
+                            </foreach>
+                        </when>
+                        <!-- 执行人 -->
+                        <when test="key == 'executeUserName' and values.size() > 0">
+                            and (
+                            t.execute_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            <if test="${nullExecutorKey} == true">
+                                or t.execute_user is null or t.execute_user = ''
+                            </if>
+                            )
+                        </when>
+                        <when test="key == 'executeUserName' and values.size() == 0">
+                            and (
+                            <if test="${nullExecutorKey} == true">
+                                t.execute_user is null or t.execute_user = ''
+                            </if>
+                            <if test="${nullExecutorKey} == false">
+                                1=1
+                            </if>
+                            )
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="queryApiDefinitionCombine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="a.create_user"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="a"/>
+                        </include>
+                        <if test="condition.name == 'protocol'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="a.protocol"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'belongTestPlan' and condition.operator == 'EQUALS'">
+                            a.id in (
+                            select api.id from api_definition api inner join api_test_case apiCase ON api.id =
+                            apiCase.api_definition_id
+                            WHERE api.deleted IS FALSE and apiCase.deleted IS FALSE and apiCase.id in (
+                            select api_case_id from test_plan_api_case where test_plan_id = #{condition.value}
+                            )
+                            )
+                        </if>
+                        <if test="condition.name == 'status'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="a.status"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'method'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="a.method"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'path'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="a.path"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'caseTotal'">
+                            <choose>
+                                <when test="condition.operator == 'NOT_EMPTY'">
+                                    a.id in (
+                                        select api_definition_id from api_test_case where deleted = ${deleted}
+                                        and project_id = '${projectId}'
+                                    )
+                                </when>
+                                <when test="condition.operator == 'EMPTY'">
+                                    a.id not in (
+                                        select api_definition_id from api_test_case where deleted = ${deleted}
+                                        and project_id = '${projectId}'
+                                    )
+                                </when>
+                                <when test="(condition.operator == 'LT' and condition.value &lt; 1) or (condition.operator == 'EQUALS' and condition.value &lt; 0)">
+                                    1=2
+                                </when>
+                                <otherwise>
+                                    <if test="condition.operator == 'LT' or (condition.operator == 'EQUALS' and condition.value == 0)">
+                                        a.id not in (
+                                            select api_definition_id from api_test_case where deleted = ${deleted}
+                                            and project_id = '${projectId}'
+                                        )
+                                        <if test="condition.value &gt; 1">
+                                            OR
+                                        </if>
+                                    </if>
+                                    <if test="(condition.operator == 'EQUALS' and condition.value &gt; 0) or (condition.operator == 'LT' and condition.value &gt; 1) or condition.operator == 'GT'">
+                                        a.id in (
+                                            select api_definition_id from api_test_case where deleted = ${deleted}
+                                            and project_id = '${projectId}'
+                                            group by api_definition_id having
+                                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                                <property name="condition" value="condition"/>
+                                                <property name="column" value="count(id)"/>
+                                            </include>
+                                        )
+                                    </if>
+                                </otherwise>
+                            </choose>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <include refid="io.metersphere.system.mapper.BaseMapper.customFiledConditions">
+                        <property name="mainIdColumn" value="a.id"/>
+                        <property name="associationTable" value="api_definition_custom_field"/>
+                        <property name="associationIdColumn" value="api_id"/>
+                        <property name="combineSearch" value="${combineSearch}"/>
+                    </include>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="atc.create_user"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.baseSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="atc"/>
+                        </include>
+                        <if test="condition.name == 'belongTestPlan' and condition.operator == 'EQUALS'">
+                            atc.id in (
+                            select api_case_id from test_plan_api_case where test_plan_id = #{condition.value}
+                            )
+                        </if>
+                        <!-- 所属模块(项目ID_模块ID 组合查询) -->
+                        <if test="condition.name == 'moduleId'">
+                            <choose>
+                                <when test="condition.operator == 'IN'">
+                                    concat(a.project_id, '_', a.module_id)  in
+                                    <foreach collection="condition.value" item="v" separator="," open="(" close=")">
+                                        <choose>
+                                            <when test="v.contains('_root')">
+                                                #{v}
+                                            </when>
+                                            <otherwise>
+                                                concat(a.project_id, '_', #{v})
+                                            </otherwise>
+                                        </choose>
+                                    </foreach>
+                                </when>
+                                <when test="condition.operator == 'NOT_IN'">
+                                    concat(a.project_id, '_', a.module_id) not in
+                                    <foreach collection="condition.value" item="v" separator="," open="(" close=")">
+                                        <choose>
+                                            <when test="v.contains('_root')">
+                                                #{v}
+                                            </when>
+                                            <otherwise>
+                                                concat(a.project_id, '_', #{v})
+                                            </otherwise>
+                                        </choose>
+                                    </foreach>
+                                </when>
+                            </choose>
+                        </if>
+                        <!-- 测试点 -->
+                        <if test="condition.name == 'testPlanCollectionId'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="test_plan_collection.id"/>
+                            </include>
+                        </if>
+                        <!-- 所属项目 -->
+                        <if test="condition.name == 'projectName'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="atc.project_id"/>
+                            </include>
+                        </if>
+                        <!-- 协议 -->
+                        <if test="condition.name == 'protocol'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="a.protocol"/>
+                            </include>
+                        </if>
+                        <!-- 用例等级 -->
+                        <if test="condition.name == 'priority'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="atc.priority"/>
+                            </include>
+                        </if>
+                        <!-- 路径 -->
+                        <if test="condition.name == 'path'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="a.path"/>
+                            </include>
+                        </if>
+                        <!-- 状态 -->
+                        <if test="condition.name == 'status'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="atc.status"/>
+                            </include>
+                        </if>
+                        <!-- 用例通过率 -->
+                        <if test="condition.name == 'passRate'">
+                            <choose>
+                                <when test="condition.operator == 'NOT_EMPTY'">
+                                    atc.id in (
+                                    select atcr.api_test_case_id as id
+                                    from api_report ar left join api_test_case_record atcr on atcr.api_report_id = ar.id
+                                    group by atcr.api_test_case_id
+                                    )
+                                </when>
+                                <when test="condition.operator == 'EMPTY'">
+                                    atc.id not in (
+                                    select atcr.api_test_case_id as id
+                                    from api_report ar left join api_test_case_record atcr on atcr.api_report_id = ar.id
+                                    group by atcr.api_test_case_id
+                                    )
+                                </when>
+                                <when test="(condition.operator == 'LT' and condition.value == 0) or (condition.operator == 'GT' and condition.value &gt; 100 )">
+                                    1=2
+                                </when>
+                                <otherwise>
+                                    atc.id in (
+                                    select rate_tmp.id from (
+                                    select atcr.api_test_case_id as id, format(sum(if(ar.`status` = 'success', 1, 0)) / count(ar.id) * 100, 2) as passRate
+                                    from api_report ar left join api_test_case_record atcr on atcr.api_report_id = ar.id
+                                    group by atcr.api_test_case_id having
+                                    <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                        <property name="condition" value="condition"/>
+                                        <property name="column" value="passRate"/>
+                                    </include>
+                                    ) rate_tmp
+                                    )
+                                </otherwise>
+                            </choose>
+                        </if>
+                        <!-- 用例环境 -->
+                        <if test="condition.name == 'environmentName'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="atc.environment_id"/>
+                            </include>
+                        </if>
+                        <!-- 执行人 -->
+                        <if test="condition.name == 'executeUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="t.execute_user"/>
+                            </include>
+                        </if>
+                        <!-- 执行结果 -->
+                        <if test="condition.name == 'lastExecResult'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="t.last_exec_result"/>
+                            </include>
+                        </if>
+                        <!-- 缺陷数 -->
+                        <if test="condition.name == 'bugCount'">
+                            <choose>
+                                <when test="condition.operator == 'NOT_EMPTY'">
+                                    t.id in (
+                                    select distinct brc.test_plan_case_id from bug_relation_case brc join bug b on brc.bug_id = b.id
+                                    where b.deleted = false and brc.test_plan_id = '${planId}' and brc.case_type = 'API'
+                                    )
+                                </when>
+                                <when test="condition.operator == 'EMPTY'">
+                                    t.id not in (
+                                    select distinct brc.test_plan_case_id from bug_relation_case brc join bug b on brc.bug_id = b.id
+                                    where b.deleted = false and brc.test_plan_id = '${planId}' and brc.case_type = 'API'
+                                    )
+                                </when>
+                                <when test="(condition.operator == 'LT' and condition.value &lt; 1) or (condition.operator == 'EQUALS' and condition.value &lt; 0)">
+                                    1=2
+                                </when>
+                                <otherwise>
+                                    <if test="condition.operator == 'LT' or (condition.operator == 'EQUALS' and condition.value == 0)">
+                                        t.id not in (
+                                        select distinct brc.test_plan_case_id from bug_relation_case brc join bug b on brc.bug_id = b.id
+                                        where b.deleted = false and brc.test_plan_id = '${planId}' and brc.case_type = 'API'
+                                        )
+                                        <if test="condition.value &gt; 1">
+                                            OR
+                                        </if>
+                                    </if>
+                                    <if test="(condition.operator == 'EQUALS' and condition.value &gt; 0) or (condition.operator == 'LT' and condition.value &gt; 1) or condition.operator == 'GT'">
+                                        t.id in (
+                                        select brc.test_plan_case_id from bug_relation_case brc join bug b on brc.bug_id = b.id
+                                        where b.deleted = false and brc.test_plan_id = '${planId}' and brc.case_type = 'API' group by brc.test_plan_case_id having
+                                        <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                            <property name="condition" value="condition"/>
+                                            <property name="column" value="count(brc.id)"/>
+                                        </include>
+                                        )
+                                    </if>
+                                </otherwise>
+                            </choose>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+
+    <sql id="queryApiCaseVersionCondition">
+        <if test="request.versionId != null and request.versionId != ''">
+            and ${versionTable}.version_id = #{request.versionId}
+        </if>
+        <if test="request.versionId == null and request.versionId != '' and request.apiDefinitionId == null and request.apiDefinitionId == ''">
+            AND a.latest = 1
+        </if>
+    </sql>
+
+    <select id="countModuleIdByRequest" resultType="io.metersphere.functional.dto.FunctionalCaseModuleCountDTO">
+        SELECT CASE WHEN a.module_id = 'root' THEN CONCAT(atc.project_id, '_', a.module_id) ELSE a.module_id END AS moduleId,
+        count(atc.id) AS dataCount, atc.project_id AS projectId, project.name AS projectName
+        FROM test_plan_api_case t
+        INNER JOIN api_test_case atc ON t.api_case_id = atc.id
+        INNER JOIN api_definition a ON atc.api_definition_id = a.id
+        INNER JOIN project ON atc.project_id = project.id
+        WHERE t.test_plan_id = #{request.testPlanId}
+        AND atc.deleted = #{deleted}
+        <include refid="queryApiCaseWhereCondition"/>
+        GROUP BY moduleId
+    </select>
+
+    <select id="selectIdByProjectIdAndTestPlanId" resultType="java.lang.String">
+        SELECT adm.id, adm.project_id
+        FROM api_definition_module adm
+        WHERE adm.id IN (SELECT ad.module_id
+                         FROM api_definition ad
+                                  LEFT JOIN api_test_case atc on atc.api_definition_id = ad.id
+                                  LEFT JOIN test_plan_api_case tpac ON tpac.api_case_id = atc.id
+                         WHERE tpac.test_plan_id = #{testPlanId}
+                           AND atc.deleted = false
+                           and atc.project_id = #{projectId})
+    </select>
+
+    <select id="caseCount"
+            resultType="java.lang.Long">
+        SELECT count(atc.id)
+        FROM test_plan_api_case t
+        INNER JOIN api_test_case atc ON t.api_case_id = atc.id
+        INNER JOIN api_definition a on atc.api_definition_id = a.id
+        WHERE t.test_plan_id = #{request.testPlanId}
+        AND atc.deleted = #{deleted}
+        <include refid="queryApiCaseWhereCondition"/>
+    </select>
+
+    <select id="selectRootIdByTestPlanId" resultType="io.metersphere.functional.dto.ProjectOptionDTO">
+        SELECT a.module_id as id, atc.project_id as name, p.name as projectName
+        FROM api_test_case atc
+                 LEFT JOIN test_plan_api_case tpac ON tpac.api_case_id = atc.id
+                 LEFT JOIN project p ON atc.project_id = p.id
+                 LEFT JOIN api_definition a on atc.api_definition_id = a.id
+        WHERE tpac.test_plan_id = #{testPlanId}
+          AND atc.deleted = false
+        ORDER BY atc.pos
+    </select>
+
+    <select id="selectBaseByProjectIdAndTestPlanId" resultType="io.metersphere.plan.dto.ApiCaseModuleDTO">
+        SELECT adm.id, adm.project_id, p.name as projectName
+        FROM api_definition_module adm
+                 LEFT JOIN project p ON adm.project_id = p.id
+        WHERE adm.id IN
+              (SELECT ad.module_id
+               FROM api_definition ad
+                        LEFT JOIN api_test_case atc on atc.api_definition_id = ad.id
+                        LEFT JOIN test_plan_api_case tpac ON tpac.api_case_id = atc.id
+               WHERE tpac.test_plan_id = #{testPlanId}
+                 AND atc.deleted = false)
+        ORDER BY pos
+    </select>
+
+    <select id="getIds" resultType="java.lang.String">
+        SELECT
+        t.id as id
+        FROM
+        test_plan_api_case t
+        INNER JOIN api_test_case atc ON t.api_case_id = atc.id
+        INNER JOIN api_definition a ON atc.api_definition_id = a.id
+        WHERE
+        t.test_plan_id = #{request.testPlanId}
+        AND atc.deleted = #{deleted}
+        <include refid="queryWhereConditionByBatchQueryRequest"/>
+    </select>
+
+    <sql id="queryWhereConditionByBatchQueryRequest">
+        <if test="request.protocols != null and request.protocols.size() > 0">
+            and a.protocol in
+            <foreach collection="request.protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <if test="request.condition.keyword != null and request.condition.keyword !=''">
+            and (
+            atc.name like concat('%', #{request.condition.keyword},'%')
+            or atc.num like concat('%', #{request.condition.keyword},'%')
+            or a.path like concat('%', #{request.condition.keyword},'%')
+            or atc.tags like concat('%', #{request.condition.keyword},'%')
+            )
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and a.module_id in
+            <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
+                #{nodeId}
+            </foreach>
+        </if>
+        <if test="request.collectionId != null and request.collectionId != ''">
+            and t.test_plan_collection_id = #{request.collectionId}
+        </if>
+        <include refid="apiCaseFilters">
+            <property name="filter" value="request.condition.filter"/>
+            <property name="nullExecutorKey" value="request.nullExecutorKey"/>
+        </include>
+        <include refid="combine">
+            <property name="combineSearch" value="request.condition.combineSearch"/>
+        </include>
+    </sql>
+
+    <update id="batchUpdateExecutor">
+        update test_plan_api_case
+        set execute_user = #{userId}
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="collectionCountByRequest" resultType="io.metersphere.project.dto.ModuleCountDTO">
+        SELECT
+        t.test_plan_collection_id AS moduleId,
+        count( t.id ) AS dataCount
+        FROM
+        api_test_case atc
+        INNER JOIN test_plan_api_case t ON atc.id = t.api_case_id
+        INNER JOIN api_definition a on atc.api_definition_id = a.id
+        WHERE
+        atc.deleted = FALSE
+        AND t.test_plan_id = #{request.testPlanId}
+        <include refid="queryApiCaseWhereCondition"/>
+        GROUP BY
+        t.test_plan_collection_id
+    </select>
+
+    <select id="getMaxPosByCollectionId" resultType="java.lang.Long">
+        SELECT max(pos)
+        FROM test_plan_api_case
+        WHERE test_plan_collection_id = #{0}
+    </select>
+
+    <select id="getPlanApiCaseByIds" resultType="io.metersphere.plan.domain.TestPlanApiCase">
+        select tpac.test_plan_id testPlanId, tpac.api_case_id apiCaseId, tpac.last_exec_result lastExecResult, tpac.execute_user executeUser
+        from test_plan_api_case tpac join api_test_case atc on atc.id = tpac.api_case_id
+        <where>
+            atc.deleted = false
+            <if test="planIds != null and planIds.size() > 0">
+                and tpac.test_plan_id in
+                <foreach collection="planIds" item="id" separator="," open="(" close=")">
+                    #{id}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <select id="getApiCaseExecuteInfoByIds" resultType="io.metersphere.plan.domain.TestPlanApiCase">
+        select id, test_plan_id, api_case_id, environment_id
+        from test_plan_api_case
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="getSelectIdAndCollectionId" resultType="io.metersphere.plan.dto.TestPlanApiCaseBatchRunDTO">
+        SELECT t.id as id, t.test_plan_collection_id as test_plan_collection_id, atc.name as name, atc.id as caseId
+        FROM test_plan_api_case t
+        INNER JOIN api_test_case atc ON t.api_case_id = atc.id
+        INNER JOIN api_definition a ON atc.api_definition_id = a.id
+        WHERE t.test_plan_id = #{request.testPlanId} AND atc.deleted = false
+        <include refid="queryWhereConditionByBatchQueryRequest"/>
+    </select>
+    <select id="selectDistinctExecResult" resultType="io.metersphere.plan.dto.TestPlanResourceExecResultDTO">
+        select distinct resource.test_plan_id AS testPlanId,
+                        CASE
+                            WHEN resource.last_exec_result = 'BLOCKED'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'FAKE_ERROR'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'ERROR'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'SUCCESS'
+                                THEN 'COMPLETED'
+                            ELSE 'PENDING'
+                            END               AS execResult,
+                        test_plan.group_id    AS testPlanGroupId
+        from test_plan_api_case resource
+                 INNER JOIN test_plan ON test_plan.id = resource.test_plan_id
+                 INNER JOIN api_test_case ON resource.api_case_id = api_test_case.id
+        where test_plan.project_id = #{projectId}
+          AND api_test_case.deleted is false
+          AND test_plan.status != 'ARCHIVED'
+    </select>
+    <select id="selectDistinctExecResultByTestPlanIds"
+            resultType="io.metersphere.plan.dto.TestPlanResourceExecResultDTO">
+        select distinct resource.test_plan_id AS testPlanId,
+        CASE
+        WHEN resource.last_exec_result = 'BLOCKED'
+        THEN 'COMPLETED'
+        WHEN resource.last_exec_result = 'FAKE_ERROR'
+        THEN 'COMPLETED'
+        WHEN resource.last_exec_result = 'ERROR'
+        THEN 'COMPLETED'
+        WHEN resource.last_exec_result = 'SUCCESS'
+        THEN 'COMPLETED'
+        ELSE 'PENDING'
+        END AS execResult,
+        test_plan.group_id AS testPlanGroupId
+        from test_plan_api_case resource
+        INNER JOIN api_test_case apiCase ON resource.api_case_id = apiCase.id
+        INNER JOIN test_plan ON test_plan.id = resource.test_plan_id
+        where resource.test_plan_id IN
+        <foreach collection="testPlanIds" item="testPlanId" separator="," open="(" close=")">
+            #{testPlanId}
+        </foreach>
+        AND apiCase.deleted IS FALSE
+    </select>
+
+    <select id="selectLastExecResultByTestPlanIds"
+            resultType="io.metersphere.plan.dto.TestPlanResourceExecResultDTO">
+        select resource.test_plan_id AS testPlanId,
+        test_plan.group_id AS testPlanGroupId,
+        CASE
+        WHEN resource.last_exec_result is null
+        THEN 'PENDING'
+        WHEN resource.last_exec_result = ''
+        THEN 'PENDING'
+        WHEN resource.last_exec_result = '-'
+        THEN 'PENDING'
+        ELSE resource.last_exec_result
+        END AS execResult
+        from test_plan_api_case resource
+        INNER JOIN api_test_case apiCase ON resource.api_case_id = apiCase.id
+        INNER JOIN test_plan ON test_plan.id = resource.test_plan_id
+        where resource.test_plan_id IN
+        <foreach collection="testPlanIds" item="testPlanId" separator="," open="(" close=")">
+            #{testPlanId}
+        </foreach>
+        AND apiCase.deleted IS FALSE
+    </select>
+    <select id="getBatchRunInfoByIds" resultType="io.metersphere.plan.dto.TestPlanApiCaseBatchRunDTO">
+        SELECT t.id as id, t.test_plan_collection_id as test_plan_collection_id, atc.name as name, atc.id as caseId
+        FROM test_plan_api_case t
+        INNER JOIN api_test_case atc ON t.api_case_id = atc.id
+        where
+        t.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="countByPlanIds" resultType="java.lang.Integer">
+        select count(0)
+        from test_plan_api_case tpac join api_test_case atc on atc.id = tpac.api_case_id
+        <where>
+            atc.deleted = false and tpac.test_plan_id in
+            <foreach collection="planIds" item="planId" open="(" separator="," close=")">
+                #{planId}
+            </foreach>
+        </where>
+    </select>
+    <select id="selectLastExecResultByProjectId"
+            resultType="io.metersphere.plan.dto.TestPlanResourceExecResultDTO">
+        select resource.test_plan_id     AS testPlanId,
+               resource.last_exec_result AS execResult,
+               test_plan.group_id        AS testPlanGroupId
+        from test_plan_api_case resource
+                 INNER JOIN test_plan ON test_plan.id = resource.test_plan_id
+                 INNER JOIN api_test_case ON resource.api_case_id = api_test_case.id
+        where test_plan.project_id = #{projectId}
+          AND api_test_case.deleted is false
+          AND test_plan.status != 'ARCHIVED'
+    </select>
+</mapper>

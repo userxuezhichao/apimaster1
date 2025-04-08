@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.project.mapper.ExtFileModuleMapper">
+    <select id="selectBaseByProjectId" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
+        SELECT id, name, parent_id AS parentId, 'module' AS type
+        FROM file_module
+        WHERE project_id = #{projectId}
+          AND module_type = #{moduleType}
+        ORDER BY pos
+    </select>
+    <select id="selectIdAndParentIdByProjectId" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
+        SELECT id, parent_id AS parentId
+        FROM file_module
+        WHERE project_id = #{projectId}
+        <if test="storage == 'MINIO'">
+            AND module_type = 'MODULE'
+        </if>
+        <if test="storage == 'GIT'">
+            AND module_type = 'GIT'
+        </if>
+
+    </select>
+    <select id="selectIdsByProjectId" resultType="java.lang.String">
+        SELECT id
+        FROM file_module
+        WHERE project_id = #{0}
+    </select>
+    <select id="selectChildrenIdsByParentIds" resultType="java.lang.String">
+        SELECT id FROM file_module WHERE parent_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+       </foreach>
+    </select>
+    <delete id="deleteByIds">
+        DELETE FROM file_module WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    <select id="getMaxPosByParentId" resultType="java.lang.Long">
+        SELECT max(pos) FROM file_module
+        WHERE parent_id = #{parentId}
+          AND module_type = #{fileType}
+    </select>
+    <select id="selectChildrenIdsSortByPos" resultType="java.lang.String">
+        SELECT id FROM file_module WHERE parent_id  = #{0}
+        ORDER BY pos ASC
+    </select>
+
+    <select id="selectModuleByParentIdAndPosOperator"
+            parameterType="io.metersphere.project.dto.NodeSortQueryParam"
+            resultType="io.metersphere.system.dto.sdk.BaseModule">
+        SELECT id, name, pos, project_Id, parent_id
+        FROM file_module
+        WHERE parent_id = #{parentId}
+        <if test="operator == 'moreThan'">
+            AND pos &gt; #{pos}
+        </if>
+        <if test="operator == 'lessThan'">
+            AND pos &lt; #{pos}
+        </if>
+        ORDER BY pos
+        <if test="operator == 'lessThan' or operator == 'latest'">
+            DESC
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="selectNameById" resultType="java.lang.String">
+        SELECT name
+        FROM file_module
+        WHERE id = #{0}
+    </select>
+    <select id="selectBaseModuleById" resultType="io.metersphere.system.dto.sdk.BaseModule">
+        SELECT id, name, pos, project_Id, parent_id
+        FROM file_module
+        WHERE id = #{0}
+    </select>
+</mapper>

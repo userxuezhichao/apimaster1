@@ -1,0 +1,457 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.ExtScheduleMapper">
+    <select id="taskCenterSchedulelist" resultType="io.metersphere.system.dto.taskcenter.TaskCenterScheduleDTO">
+        select task.*, QRTZ_TRIGGERS.NEXT_FIRE_TIME AS next_time, project.organization_id from (
+        <if test="request.scheduleTagType == 'API_IMPORT'">
+            SELECT
+            schedule.id,
+            schedule.name as taskname,
+            schedule.project_id,
+            resource_type,
+            ads.num as resource_num,
+            ads.name as resource_name,
+            ads.id as resource_id,
+            schedule.value,
+            schedule.enable,
+            schedule.create_user AS createUserName,
+            schedule.create_time,
+            ads.swagger_url
+            FROM
+            schedule
+            inner join api_definition_swagger ads on schedule.resource_id = ads.id
+
+        </if>
+        <if test="request.scheduleTagType == 'API_SCENARIO'">
+            SELECT
+            schedule.id,
+            schedule.name as taskname,
+            schedule.project_id,
+            resource_type,
+            api_scenario.num as resource_num,
+            api_scenario.name as resource_name,
+            api_scenario.id as resource_id,
+            schedule.value,
+            schedule.enable,
+            schedule.create_user AS createUserName,
+            schedule.create_time
+            FROM
+            schedule
+            inner join api_scenario on schedule.resource_id = api_scenario.id
+        </if>
+
+        <if test="request.scheduleTagType == 'TEST_PLAN'">
+            SELECT
+            schedule.id,
+            schedule.name as taskname,
+            schedule.project_id,
+            resource_type,
+            test_plan.num as resource_num,
+            test_plan.name as resource_name,
+            test_plan.id as resource_id,
+            schedule.value,
+            schedule.enable,
+            schedule.create_user AS createUserName,
+            schedule.create_time,
+            test_plan.type
+            FROM
+            schedule
+            inner join test_plan on schedule.resource_id = test_plan.id
+        </if>
+
+        ) task left join project on task.project_id = project.id
+        left join QRTZ_TRIGGERS on task.resource_id = QRTZ_TRIGGERS.TRIGGER_NAME
+        where
+        task.resource_type =#{request.scheduleTagType}
+        <if test="projectIds != null and projectIds.size() > 0">
+            and task.project_id IN
+            <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+                #{projectId}
+            </foreach>
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            task.resource_name like concat('%', #{request.keyword},'%')
+            or
+            task.resource_num like concat('%', #{request.keyword},'%')
+
+            <if test="request.scheduleTagType == 'API_IMPORT'">
+                or task.swagger_url like concat('%', #{request.keyword},'%')
+            </if>
+            )
+        </if>
+        <include refid="taskCenterScheduleFilters">
+            <property name="filter" value="request.filter"/>
+        </include>
+    </select>
+
+    <sql id="taskCenterScheduleFilters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='resourceType'">
+                            and task.resource_type in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='projectIds'">
+                            and task.project_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='organizationIds'">
+                            and project.organization_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='type'">
+                            and task.type in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="getApiTestCaseListByIds" resultType="io.metersphere.api.domain.ApiTestCase">
+        select
+        api_test_case.id,
+        api_test_case.num,
+        api_test_case.name
+        from api_test_case where api_report.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+
+    </select>
+
+    <select id="getApiScenarioListByIds" resultType="io.metersphere.api.domain.ApiScenario">
+        select
+        api_scenario.id,
+        api_scenario.num,
+        api_scenario.name
+        from api_scenario where api_scenario.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="countByIdAndEnable" resultType="java.lang.Long">
+        select count(*)
+        from schedule
+        where id = #{id}
+          and enable = #{enable}
+    </select>
+    <select id="countQuartzTriggersByResourceId" resultType="java.lang.Long">
+        SELECT *
+        FROM QRTZ_TRIGGERS
+        WHERE TRIGGER_NAME = #{0}
+
+    </select>
+    <select id="countQuartzCronTriggersByResourceId" resultType="java.lang.Long">
+        SELECT *
+        FROM QRTZ_CRON_TRIGGERS
+        WHERE TRIGGER_NAME = #{0}
+    </select>
+    <select id="countByResourceId" resultType="java.lang.Long">
+        SELECT count(*)
+        FROM schedule
+        WHERE resource_id = #{0}
+    </select>
+
+    <select id="getScheduleByLimit" resultType="io.metersphere.system.domain.Schedule">
+        SELECT * FROM schedule ORDER BY create_time LIMIT #{start}, #{limit}
+    </select>
+    <select id="getOrgListByProjectIds" resultType="io.metersphere.system.dto.ProjectDTO">
+        select
+        p.id ,
+        o.id as organizationId
+        from project p
+        inner join organization o on p.organization_id = o.id
+        where p.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="getSchedule" resultType="io.metersphere.system.domain.Schedule">
+        select task.* from (
+        <if test="request.scheduleTagType == 'API_IMPORT'">
+            SELECT
+            schedule.*,
+            ads.num as resource_num,
+            ads.name as resource_name
+            FROM
+            schedule
+            inner join api_definition_swagger ads on schedule.resource_id = ads.id
+
+        </if>
+        <if test="request.scheduleTagType == 'API_SCENARIO'">
+            SELECT
+            schedule.*,
+            api_scenario.num as resource_num,
+            api_scenario.name as resource_name
+            FROM
+            schedule
+            inner join api_scenario on schedule.resource_id = api_scenario.id
+        </if>
+        <if test="request.scheduleTagType == 'TEST_PLAN'">
+            SELECT
+            schedule.id,
+            schedule.name,
+            schedule.project_id,
+            schedule.resource_id,
+            schedule.value,
+            schedule.enable,
+            schedule.key,
+            schedule.job,
+            schedule.resource_type,
+            schedule.config,
+            test_plan.type,
+            test_plan.num as resource_num,
+            test_plan.name as resource_name
+            from
+            schedule
+            inner join test_plan on schedule.resource_id = test_plan.id
+        </if>
+
+        ) task left join project on task.project_id = project.id
+        where
+        task.resource_type =#{request.scheduleTagType}
+        <if test="projectIds != null and projectIds.size() > 0">
+            and task.project_id IN
+            <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+                #{projectId}
+            </foreach>
+        </if>
+        <if test="request.condition.keyword != null and request.condition.keyword != ''">
+            and (
+            task.resource_name like concat('%', #{request.condition.keyword},'%')
+            or
+            task.resource_num like concat('%', #{request.condition.keyword},'%')
+            )
+        </if>
+        <include refid="taskCenterScheduleFilters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+    </select>
+    <select id="countByProjectIds" resultType="java.lang.Integer">
+        select count(*) from schedule
+        where resource_type in ('API_IMPORT', 'API_SCENARIO', 'TEST_PLAN')
+          <if test="ids != null and ids.size() > 0">
+            and project_id in
+            <foreach collection="ids" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+          </if>
+    </select>
+
+
+    <select id="selectScheduleList" resultType="io.metersphere.system.dto.taskhub.TaskHubScheduleDTO">
+        select task.* from (
+        <!-- api导入 -->
+        SELECT
+        schedule.id,
+        schedule.project_id,
+        resource_type,
+        schedule.num as num,
+        ads.name as taskname,
+        ads.id as resource_id,
+        schedule.value,
+        schedule.enable,
+        schedule.create_user AS createUserName,
+        schedule.create_time,
+        QRTZ_TRIGGERS.PREV_FIRE_TIME AS last_time,
+        QRTZ_TRIGGERS.NEXT_FIRE_TIME AS next_time,
+        project.organization_id,
+        project.name as projectName,
+        ads.num as resourceNum
+        FROM
+        schedule
+        inner join api_definition_swagger ads on schedule.resource_id = ads.id
+        left join project on schedule.project_id = project.id
+        left join QRTZ_TRIGGERS on ads.id = QRTZ_TRIGGERS.TRIGGER_NAME
+        union all
+        <!-- 接口场景 -->
+        SELECT
+        schedule.id,
+        schedule.project_id,
+        resource_type,
+        schedule.num as num,
+        api_scenario.name as taskname,
+        api_scenario.id as resource_id,
+        schedule.value,
+        schedule.enable,
+        schedule.create_user AS createUserName,
+        schedule.create_time,
+        QRTZ_TRIGGERS.PREV_FIRE_TIME AS last_time,
+        QRTZ_TRIGGERS.NEXT_FIRE_TIME AS next_time,
+        project.organization_id,
+        project.name as projectName,
+        api_scenario.num as resourceNum
+        FROM
+        schedule
+        inner join api_scenario on schedule.resource_id = api_scenario.id
+        left join project on schedule.project_id = project.id
+        left join QRTZ_TRIGGERS on api_scenario.id = QRTZ_TRIGGERS.TRIGGER_NAME
+        union all
+        <!-- 测试计划 -->
+        SELECT
+        schedule.id,
+        schedule.project_id,
+        resource_type,
+        schedule.num as num,
+        test_plan.name as taskname,
+        test_plan.id as resource_id,
+        schedule.value,
+        schedule.enable,
+        schedule.create_user AS createUserName,
+        schedule.create_time,
+        QRTZ_TRIGGERS.PREV_FIRE_TIME AS last_time,
+        QRTZ_TRIGGERS.NEXT_FIRE_TIME AS next_time,
+        project.organization_id,
+        project.name as projectName,
+        test_plan.num as resourceNum
+        FROM
+        schedule
+        inner join test_plan on schedule.resource_id = test_plan.id
+        left join project on schedule.project_id = project.id
+        left join QRTZ_TRIGGERS on test_plan.id = QRTZ_TRIGGERS.TRIGGER_NAME
+        union all
+        <!-- 缺陷 -->
+        SELECT DISTINCT
+        schedule.id,
+        schedule.project_id,
+        resource_type,
+        schedule.num as num,
+        schedule.name as taskname,
+        '' as resource_id,
+        schedule.value,
+        schedule.enable,
+        schedule.create_user AS createUserName,
+        schedule.create_time,
+        QRTZ_TRIGGERS.PREV_FIRE_TIME AS last_time,
+        QRTZ_TRIGGERS.NEXT_FIRE_TIME AS next_time,
+        project.organization_id,
+        project.name as projectName,
+        project.num as resourceNum
+        FROM
+        schedule
+        left join project on schedule.project_id = project.id
+        left join QRTZ_TRIGGERS on schedule.job = QRTZ_TRIGGERS.JOB_GROUP and schedule.key =
+        QRTZ_TRIGGERS.TRIGGER_NAME
+        where resource_type = 'BUG_SYNC'
+        union all
+        <!-- 需求 -->
+        SELECT DISTINCT
+        schedule.id,
+        schedule.project_id,
+        resource_type,
+        schedule.num as num,
+        schedule.name as taskname,
+        '' as resource_id,
+        schedule.value,
+        schedule.enable,
+        schedule.create_user AS createUserId,
+        schedule.create_time,
+        QRTZ_TRIGGERS.PREV_FIRE_TIME AS last_time,
+        QRTZ_TRIGGERS.NEXT_FIRE_TIME AS nextTime,
+        project.organization_id,
+        project.name as projectName,
+        project.num as resourceNum
+        FROM
+        schedule
+        left join project on schedule.project_id = project.id
+        left join QRTZ_TRIGGERS on schedule.job = QRTZ_TRIGGERS.JOB_GROUP and schedule.key =
+        QRTZ_TRIGGERS.TRIGGER_NAME
+        where resource_type ='DEMAND_SYNC'
+        ) task
+        <where>
+            <include refid="taskCenterQuery">
+                <property name="request" value="request"/>
+                <property name="projectIds" value="projectIds"/>
+            </include>
+        </where>
+    </select>
+    <select id="getLastAndNextTime" resultType="io.metersphere.system.dto.taskhub.TaskHubScheduleDTO">
+        SELECT JOB_NAME AS resource_id, NEXT_FIRE_TIME AS nextTime, PREV_FIRE_TIME AS lastTime
+        FROM QRTZ_TRIGGERS WHERE TRIGGER_NAME IN
+        <foreach collection="resourceIds" item="resourceId" separator="," open="(" close=")">
+            #{resourceId}
+        </foreach>
+    </select>
+
+    <sql id="taskCenterQuery">
+        <if test="projectIds != null and projectIds.size() > 0">
+            and task.project_id IN
+            <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+                #{projectId}
+            </foreach>
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            task.taskname like concat('%', #{request.keyword},'%')
+            or
+            task.num like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <include refid="taskCenterFilters">
+            <property name="filter" value="request.filter"/>
+        </include>
+    </sql>
+
+    <sql id="taskCenterFilters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='resourceType'">
+                            and task.resource_type in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='projectName'">
+                            and task.project_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='organizationName'">
+                            and task.organization_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='status'">
+                            and task.enable in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                b#{value}
+                            </foreach>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+
+    <select id="getSchedules" resultType="io.metersphere.system.domain.Schedule">
+        select * from schedule
+        <where>
+            <if test="projectIds != null and projectIds.size() > 0">
+                and project_id IN
+                <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+                    #{projectId}
+                </foreach>
+            </if>
+            <if test="request.condition.keyword != null and request.condition.keyword != ''">
+                and (
+                schedule.num like concat('%', #{request.condition.keyword},'%')
+                or schedule.name like concat('%', #{request.condition.keyword},'%')
+                )
+            </if>
+        </where>
+    </select>
+</mapper>

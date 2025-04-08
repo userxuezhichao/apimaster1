@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.BaseOperationHistoryMapper">
+
+
+    <select id="selectSourceIds" resultType="java.lang.String">
+        select source_id from operation_history GROUP BY source_id having count(source_id) > #{limit}
+    </select>
+
+
+    <select id="selectIdsBySourceId" resultType="java.lang.Long">
+        select id from operation_history where source_id = #{sourceId} ORDER BY create_time DESC LIMIT #{limit}
+    </select>
+
+    <delete id="deleteBySourceId">
+        DELETE FROM operation_history WHERE source_id = #{sourceId} and id not in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="list" resultType="io.metersphere.system.dto.OperationHistoryDTO">
+        select id, project_id, create_time, create_user, source_id, `type`, `module`, ref_id
+        from operation_history
+        <where>
+            <if test="request.projectId != null and request.projectId != ''">
+                AND project_id = #{request.projectId,jdbcType=VARCHAR}
+            </if>
+            <if test="request.sourceId != null and request.sourceId != ''">
+                AND source_id = #{request.sourceId,jdbcType=VARCHAR}
+            </if>
+            <if test="request.createUser != null and request.createUser != ''">
+                AND create_user = #{request.createUser,jdbcType=VARCHAR}
+            </if>
+            <if test="request.type != null and request.type != ''">
+                AND `type` = #{request.type,jdbcType=VARCHAR}
+            </if>
+            <if test="request.module != null and request.module != ''">
+                AND `module` = #{request.module,jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
+
+    <select id="listWidthTable" resultType="io.metersphere.system.dto.OperationHistoryDTO">
+        SELECT operation_history.id, operation_history.project_id, operation_history.create_time, operation_history.create_user, operation_history.source_id, operation_history.`type`, operation_history.`module`, operation_history.ref_id, project_version.name as versionName
+        FROM operation_history
+        LEFT JOIN ${table} sourceTable ON sourceTable.id = operation_history.source_id
+        LEFT JOIN project_version ON project_version.id = sourceTable.version_id
+        <where>
+            <if test="request.projectId != null and request.projectId != ''">
+                AND operation_history.project_id = #{request.projectId,jdbcType=VARCHAR}
+            </if>
+            <if test="request.sourceId != null and request.sourceId != ''">
+                AND operation_history.source_id = #{request.sourceId,jdbcType=VARCHAR}
+            </if>
+            <if test="request.createUser != null and request.createUser != ''">
+                AND operation_history.create_user = #{request.createUser,jdbcType=VARCHAR}
+            </if>
+            <if test="request.types != null and request.types.size() > 0">
+                AND operation_history.`type` in
+                <foreach collection="request.types" item="type" open="(" close=")" separator=",">
+                    #{type}
+                </foreach>
+            </if>
+            <if test="request.modules != null and request.modules !=''">
+                AND operation_history.`module` like CONCAT('%',#{request.modules},'%')
+            </if>
+        </where>
+    </select>
+    <select id="selectLatestIdByOperationId" resultType="java.lang.Long">
+        select id
+        from operation_history
+        where source_id = #{0}
+        order by create_time desc
+        limit 1
+    </select>
+</mapper>

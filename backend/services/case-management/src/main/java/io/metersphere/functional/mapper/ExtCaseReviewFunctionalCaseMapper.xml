@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.functional.mapper.ExtCaseReviewFunctionalCaseMapper">
+
+    <select id="list" resultType="io.metersphere.functional.dto.FunctionalCaseReviewDTO">
+        SELECT
+        cf.*, cr.num as reviewNum, cr.name as reviewName, cr.status as reviewStatus
+        FROM
+        case_review_functional_case cf left join case_review cr on cf.review_id = cr.id
+        where cf.case_id = #{request.caseId}
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            cr.num like concat('%', #{request.keyword},'%')
+            or cr.name like concat('%', #{request.keyword},'%')
+            )
+        </if>
+    </select>
+
+    <update id="updateStatus">
+        update case_review_functional_case
+        set status      = #{status},
+            update_time = UNIX_TIMESTAMP() * 1000
+        where review_id = #{reviewId}
+          and case_id = #{caseId}
+    </update>
+
+
+    <select id="getCaseIdsByReviewId" parameterType="java.lang.String" resultType="java.lang.String">
+        select case_id
+        from case_review_functional_case
+        where review_id = #{reviewId}
+    </select>
+
+    <select id="page" resultType="io.metersphere.functional.dto.ReviewFunctionalCaseDTO">
+        SELECT
+        crfc.id as id,
+        crfc.review_id as reviewId,
+        crfc.case_id as caseId,
+        crfc.`status` as status,
+        crfc.create_time as createTime,
+        functional_case.create_user as createUser,
+        user.name as createUserName,
+        functional_case.version_id as versionId,
+        functional_case.module_id as moduleId,
+        functional_case.name as name,
+        functional_case.num as num,
+        functional_case.case_edit_type as caseEditType
+        FROM
+        case_review_functional_case crfc
+        LEFT JOIN functional_case ON crfc.case_id = functional_case.id
+        LEFT JOIN user ON functional_case.create_user = user.id
+        WHERE
+        review_id = #{request.reviewId}
+        AND functional_case.deleted = #{deleted}
+        <include refid="queryWhereCondition"/>
+        order by
+        <if test="sort != null and sort != ''">
+            functional_case.${sort}
+        </if>
+        <if test="sort == null or sort == ''">
+            crfc.pos desc
+        </if>
+    </select>
+
+
+    <sql id="queryWhereCondition">
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and functional_case.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" separator="," open="(" close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            functional_case.name like concat('%', #{request.keyword},'%')
+            or functional_case.num like concat('%', #{request.keyword},'%')
+            or functional_case.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.filter"/>
+        </include>
+
+        <include refid="combine">
+            <property name="combineSearch" value="request.combineSearch"/>
+        </include>
+    </sql>
+
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='status'">
+                            and crfc.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='last_execute_result'">
+                            and functional_case.last_execute_result in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='version_id'">
+                            and functional_case.version_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='caseLevel'">
+                            and functional_case.id in (
+                            select case_id from functional_case_custom_field where `value` in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                        <when test="key.startsWith('custom_single')">
+                            and functional_case.id in (
+                            select resource_id from custom_field_test_case where concat('custom_single-',field_id) =
+                            #{key}
+                            and trim(both '"' from `value`) in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                        <when test="key.startsWith('custom_multiple')">
+                            and functional_case.id in (
+                            select resource_id from custom_field_test_case where concat('custom_multiple-',field_id) =
+                            #{key}
+                            and JSON_CONTAINS(`value`, json_array(#{value}))
+                        </when>
+                        <when test="key == 'create_user' || key == 'createUserName'">
+                            and functional_case.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="functional_case.create_user"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'reviewers'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="crfc.case_id"/>
+                                <property name="associationTable" value="case_review_functional_case_user"/>
+                                <property name="associationIdColumn" value="case_id"/>
+                                <property name="searchColumn" value="user_id"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="functional_case"/>
+                        </include>
+                        <if test="condition.name == 'status'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="crfc.status"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'lastExecuteResult'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="functional_case.last_execute_result"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'demand'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="functional_case.id"/>
+                                <property name="associationTable" value="functional_case_demand"/>
+                                <property name="associationIdColumn" value="case_id"/>
+                                <property name="searchColumn" value="demand_name"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'attachment'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="functional_case.id"/>
+                                <property name="associationTable" value="functional_case_attachment"/>
+                                <property name="associationIdColumn" value="case_id"/>
+                                <property name="searchColumn" value="file_name"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'reviewers'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="crfc.case_id"/>
+                                <property name="associationTable" value="case_review_functional_case_user"/>
+                                <property name="associationIdColumn" value="case_id"/>
+                                <property name="searchColumn" value="user_id"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <include refid="io.metersphere.system.mapper.BaseMapper.customFiledConditions">
+                        <property name="mainIdColumn" value="functional_case.id"/>
+                        <property name="associationTable" value="functional_case_custom_field"/>
+                        <property name="associationIdColumn" value="case_id"/>
+                        <property name="combineSearch" value="${combineSearch}"/>
+                    </include>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+
+    <select id="getIds" resultType="java.lang.String">
+        SELECT
+        crfc.id as id
+        FROM
+        case_review_functional_case crfc
+        LEFT JOIN functional_case ON crfc.case_id = functional_case.id
+        WHERE
+        review_id = #{request.reviewId}
+        AND functional_case.deleted = #{deleted}
+        <include refid="queryWhereConditionByBaseQueryRequest"/>
+    </select>
+
+    <select id="getListByRequest" resultType="io.metersphere.functional.domain.CaseReviewFunctionalCase">
+        SELECT
+        crfc.*
+        FROM
+        case_review_functional_case crfc
+        LEFT JOIN functional_case ON crfc.case_id = functional_case.id
+        WHERE
+        review_id = #{request.reviewId}
+        AND functional_case.deleted = #{deleted}
+        <include refid="queryWhereConditionByBaseQueryRequest"/>
+        <if test="request.excludeIds != null and request.excludeIds.size() > 0">
+            and crfc.id not in
+            <foreach collection="request.excludeIds" item="excludeId" open="(" separator="," close=")">
+                #{excludeId}
+            </foreach>
+        </if>
+    </select>
+
+
+    <sql id="queryWhereConditionByBaseQueryRequest">
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and functional_case.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" separator="," open="(" close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+        <if test="request.condition.keyword != null">
+            and (
+            functional_case.name like concat('%', #{request.keyword},'%')
+            or functional_case.num like concat('%', #{request.keyword},'%')
+            or functional_case.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+        <include refid="combine">
+            <property name="combineSearch" value="request.condition.combineSearch"/>
+        </include>
+    </sql>
+
+    <select id="getPos" resultType="java.lang.Long">
+        SELECT pos
+        FROM case_review_functional_case
+        WHERE review_id = #{reviewId}
+        ORDER BY pos DESC
+        LIMIT 1;
+    </select>
+
+    <select id="getList" resultType="io.metersphere.functional.domain.CaseReviewFunctionalCase">
+        SELECT
+        crfc.id, crfc.review_id, crfc.case_id, crfc.status, crfc.create_time, crfc.create_user
+        FROM
+        case_review_functional_case crfc
+        LEFT JOIN functional_case fc ON crfc.case_id = fc.id
+        WHERE
+        fc.deleted = #{deleted}
+        <if test="reviewId != null and reviewId != ''">
+            and crfc.review_id = #{reviewId}
+        </if>
+        <if test="reviewIds != null and reviewIds.size() > 0">
+            and crfc.review_id in
+            <foreach collection="reviewIds" item="reviewId" separator="," open="(" close=")">
+                #{reviewId}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getListExcludes" resultType="io.metersphere.functional.domain.CaseReviewFunctionalCase">
+        SELECT
+        crfc.id, crfc.review_id, crfc.case_id, crfc.status, crfc.create_time, crfc.create_user
+        FROM
+        case_review_functional_case crfc
+        LEFT JOIN functional_case fc ON crfc.case_id = fc.id
+        WHERE
+        fc.deleted = #{deleted}
+        <if test="reviewIds != null and reviewIds.size() > 0">
+            and crfc.review_id in
+            <foreach collection="reviewIds" item="reviewId" separator="," open="(" close=")">
+                #{reviewId}
+            </foreach>
+        </if>
+        <if test="caseIds != null and caseIds.size() > 0">
+            and fc.id not in
+            <foreach collection="caseIds" item="caseId" separator="," open="(" close=")">
+                #{caseId}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getPrePos" resultType="java.lang.Long">
+        select `pos` from case_review_functional_case where review_id = #{reviewId}
+        <if test="basePos != null">
+            and `pos` &lt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+
+    <select id="getLastPos" resultType="java.lang.Long">
+        select `pos` from case_review_functional_case where review_id = #{reviewId}
+        <if test="basePos != null">
+            and `pos` &gt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+    <select id="getCaseIdsByIds" resultType="io.metersphere.functional.domain.CaseReviewFunctionalCase">
+        select id, case_id as caseId, status from case_review_functional_case where id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="countModuleIdByRequest" resultType="io.metersphere.functional.dto.FunctionalCaseModuleCountDTO">
+        SELECT functional_case.module_id AS moduleId, count(functional_case.id) AS dataCount, functional_case.project_id
+        AS projectId, project.name AS projectName
+        FROM case_review_functional_case crfc
+        LEFT JOIN functional_case ON crfc.case_id = functional_case.id
+        LEFT JOIN project ON functional_case.project_id = project.id
+        WHERE crfc.review_id = #{request.reviewId}
+        AND functional_case.deleted = #{deleted}
+        <include refid="queryWhereCondition"/>
+        GROUP BY module_id
+    </select>
+
+    <select id="caseCount"
+            resultType="java.lang.Long">
+        SELECT count(functional_case.id)
+        FROM case_review_functional_case crfc LEFT JOIN functional_case ON crfc.case_id = functional_case.id
+        WHERE crfc.review_id = #{request.reviewId}
+        AND functional_case.deleted = #{deleted}
+        <include refid="queryWhereCondition"/>
+    </select>
+
+
+</mapper>

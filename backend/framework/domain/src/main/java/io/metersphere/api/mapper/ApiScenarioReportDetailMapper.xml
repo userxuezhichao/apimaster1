@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.api.mapper.ApiScenarioReportDetailMapper">
+  <resultMap id="BaseResultMap" type="io.metersphere.api.domain.ApiScenarioReportDetail">
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="report_id" jdbcType="VARCHAR" property="reportId" />
+    <result column="step_id" jdbcType="VARCHAR" property="stepId" />
+    <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="fake_code" jdbcType="VARCHAR" property="fakeCode" />
+    <result column="request_name" jdbcType="VARCHAR" property="requestName" />
+    <result column="request_time" jdbcType="BIGINT" property="requestTime" />
+    <result column="code" jdbcType="VARCHAR" property="code" />
+    <result column="response_size" jdbcType="BIGINT" property="responseSize" />
+    <result column="script_identifier" jdbcType="VARCHAR" property="scriptIdentifier" />
+    <result column="sort" jdbcType="BIGINT" property="sort" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, report_id, step_id, `status`, fake_code, request_name, request_time, code, response_size, 
+    script_identifier, sort
+  </sql>
+  <select id="selectByExample" parameterType="io.metersphere.api.domain.ApiScenarioReportDetailExample" resultMap="BaseResultMap">
+    select
+    <if test="distinct">
+      distinct
+    </if>
+    <include refid="Base_Column_List" />
+    from api_scenario_report_detail
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from api_scenario_report_detail
+    where id = #{id,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
+    delete from api_scenario_report_detail
+    where id = #{id,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="io.metersphere.api.domain.ApiScenarioReportDetailExample">
+    delete from api_scenario_report_detail
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="io.metersphere.api.domain.ApiScenarioReportDetail">
+    insert into api_scenario_report_detail (id, report_id, step_id, 
+      `status`, fake_code, request_name, 
+      request_time, code, response_size, 
+      script_identifier, sort)
+    values (#{id,jdbcType=VARCHAR}, #{reportId,jdbcType=VARCHAR}, #{stepId,jdbcType=VARCHAR}, 
+      #{status,jdbcType=VARCHAR}, #{fakeCode,jdbcType=VARCHAR}, #{requestName,jdbcType=VARCHAR}, 
+      #{requestTime,jdbcType=BIGINT}, #{code,jdbcType=VARCHAR}, #{responseSize,jdbcType=BIGINT}, 
+      #{scriptIdentifier,jdbcType=VARCHAR}, #{sort,jdbcType=BIGINT})
+  </insert>
+  <insert id="insertSelective" parameterType="io.metersphere.api.domain.ApiScenarioReportDetail">
+    insert into api_scenario_report_detail
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="reportId != null">
+        report_id,
+      </if>
+      <if test="stepId != null">
+        step_id,
+      </if>
+      <if test="status != null">
+        `status`,
+      </if>
+      <if test="fakeCode != null">
+        fake_code,
+      </if>
+      <if test="requestName != null">
+        request_name,
+      </if>
+      <if test="requestTime != null">
+        request_time,
+      </if>
+      <if test="code != null">
+        code,
+      </if>
+      <if test="responseSize != null">
+        response_size,
+      </if>
+      <if test="scriptIdentifier != null">
+        script_identifier,
+      </if>
+      <if test="sort != null">
+        sort,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=VARCHAR},
+      </if>
+      <if test="reportId != null">
+        #{reportId,jdbcType=VARCHAR},
+      </if>
+      <if test="stepId != null">
+        #{stepId,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="fakeCode != null">
+        #{fakeCode,jdbcType=VARCHAR},
+      </if>
+      <if test="requestName != null">
+        #{requestName,jdbcType=VARCHAR},
+      </if>
+      <if test="requestTime != null">
+        #{requestTime,jdbcType=BIGINT},
+      </if>
+      <if test="code != null">
+        #{code,jdbcType=VARCHAR},
+      </if>
+      <if test="responseSize != null">
+        #{responseSize,jdbcType=BIGINT},
+      </if>
+      <if test="scriptIdentifier != null">
+        #{scriptIdentifier,jdbcType=VARCHAR},
+      </if>
+      <if test="sort != null">
+        #{sort,jdbcType=BIGINT},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="io.metersphere.api.domain.ApiScenarioReportDetailExample" resultType="java.lang.Long">
+    select count(*) from api_scenario_report_detail
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update api_scenario_report_detail
+    <set>
+      <if test="record.id != null">
+        id = #{record.id,jdbcType=VARCHAR},
+      </if>
+      <if test="record.reportId != null">
+        report_id = #{record.reportId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.stepId != null">
+        step_id = #{record.stepId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.status != null">
+        `status` = #{record.status,jdbcType=VARCHAR},
+      </if>
+      <if test="record.fakeCode != null">
+        fake_code = #{record.fakeCode,jdbcType=VARCHAR},
+      </if>
+      <if test="record.requestName != null">
+        request_name = #{record.requestName,jdbcType=VARCHAR},
+      </if>
+      <if test="record.requestTime != null">
+        request_time = #{record.requestTime,jdbcType=BIGINT},
+      </if>
+      <if test="record.code != null">
+        code = #{record.code,jdbcType=VARCHAR},
+      </if>
+      <if test="record.responseSize != null">
+        response_size = #{record.responseSize,jdbcType=BIGINT},
+      </if>
+      <if test="record.scriptIdentifier != null">
+        script_identifier = #{record.scriptIdentifier,jdbcType=VARCHAR},
+      </if>
+      <if test="record.sort != null">
+        sort = #{record.sort,jdbcType=BIGINT},
+      </if>
+    </set>
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update api_scenario_report_detail
+    set id = #{record.id,jdbcType=VARCHAR},
+      report_id = #{record.reportId,jdbcType=VARCHAR},
+      step_id = #{record.stepId,jdbcType=VARCHAR},
+      `status` = #{record.status,jdbcType=VARCHAR},
+      fake_code = #{record.fakeCode,jdbcType=VARCHAR},
+      request_name = #{record.requestName,jdbcType=VARCHAR},
+      request_time = #{record.requestTime,jdbcType=BIGINT},
+      code = #{record.code,jdbcType=VARCHAR},
+      response_size = #{record.responseSize,jdbcType=BIGINT},
+      script_identifier = #{record.scriptIdentifier,jdbcType=VARCHAR},
+      sort = #{record.sort,jdbcType=BIGINT}
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="io.metersphere.api.domain.ApiScenarioReportDetail">
+    update api_scenario_report_detail
+    <set>
+      <if test="reportId != null">
+        report_id = #{reportId,jdbcType=VARCHAR},
+      </if>
+      <if test="stepId != null">
+        step_id = #{stepId,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null">
+        `status` = #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="fakeCode != null">
+        fake_code = #{fakeCode,jdbcType=VARCHAR},
+      </if>
+      <if test="requestName != null">
+        request_name = #{requestName,jdbcType=VARCHAR},
+      </if>
+      <if test="requestTime != null">
+        request_time = #{requestTime,jdbcType=BIGINT},
+      </if>
+      <if test="code != null">
+        code = #{code,jdbcType=VARCHAR},
+      </if>
+      <if test="responseSize != null">
+        response_size = #{responseSize,jdbcType=BIGINT},
+      </if>
+      <if test="scriptIdentifier != null">
+        script_identifier = #{scriptIdentifier,jdbcType=VARCHAR},
+      </if>
+      <if test="sort != null">
+        sort = #{sort,jdbcType=BIGINT},
+      </if>
+    </set>
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="io.metersphere.api.domain.ApiScenarioReportDetail">
+    update api_scenario_report_detail
+    set report_id = #{reportId,jdbcType=VARCHAR},
+      step_id = #{stepId,jdbcType=VARCHAR},
+      `status` = #{status,jdbcType=VARCHAR},
+      fake_code = #{fakeCode,jdbcType=VARCHAR},
+      request_name = #{requestName,jdbcType=VARCHAR},
+      request_time = #{requestTime,jdbcType=BIGINT},
+      code = #{code,jdbcType=VARCHAR},
+      response_size = #{responseSize,jdbcType=BIGINT},
+      script_identifier = #{scriptIdentifier,jdbcType=VARCHAR},
+      sort = #{sort,jdbcType=BIGINT}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <insert id="batchInsert" parameterType="map">
+    insert into api_scenario_report_detail
+    (id, report_id, step_id, `status`, fake_code, request_name, request_time, code, response_size, 
+      script_identifier, sort)
+    values
+    <foreach collection="list" item="item" separator=",">
+      (#{item.id,jdbcType=VARCHAR}, #{item.reportId,jdbcType=VARCHAR}, #{item.stepId,jdbcType=VARCHAR}, 
+        #{item.status,jdbcType=VARCHAR}, #{item.fakeCode,jdbcType=VARCHAR}, #{item.requestName,jdbcType=VARCHAR}, 
+        #{item.requestTime,jdbcType=BIGINT}, #{item.code,jdbcType=VARCHAR}, #{item.responseSize,jdbcType=BIGINT}, 
+        #{item.scriptIdentifier,jdbcType=VARCHAR}, #{item.sort,jdbcType=BIGINT})
+    </foreach>
+  </insert>
+  <insert id="batchInsertSelective" parameterType="map">
+    insert into api_scenario_report_detail (
+    <foreach collection="selective" item="column" separator=",">
+      ${column.escapedColumnName}
+    </foreach>
+    )
+    values
+    <foreach collection="list" item="item" separator=",">
+      (
+      <foreach collection="selective" item="column" separator=",">
+        <if test="'id'.toString() == column.value">
+          #{item.id,jdbcType=VARCHAR}
+        </if>
+        <if test="'report_id'.toString() == column.value">
+          #{item.reportId,jdbcType=VARCHAR}
+        </if>
+        <if test="'step_id'.toString() == column.value">
+          #{item.stepId,jdbcType=VARCHAR}
+        </if>
+        <if test="'status'.toString() == column.value">
+          #{item.status,jdbcType=VARCHAR}
+        </if>
+        <if test="'fake_code'.toString() == column.value">
+          #{item.fakeCode,jdbcType=VARCHAR}
+        </if>
+        <if test="'request_name'.toString() == column.value">
+          #{item.requestName,jdbcType=VARCHAR}
+        </if>
+        <if test="'request_time'.toString() == column.value">
+          #{item.requestTime,jdbcType=BIGINT}
+        </if>
+        <if test="'code'.toString() == column.value">
+          #{item.code,jdbcType=VARCHAR}
+        </if>
+        <if test="'response_size'.toString() == column.value">
+          #{item.responseSize,jdbcType=BIGINT}
+        </if>
+        <if test="'script_identifier'.toString() == column.value">
+          #{item.scriptIdentifier,jdbcType=VARCHAR}
+        </if>
+        <if test="'sort'.toString() == column.value">
+          #{item.sort,jdbcType=BIGINT}
+        </if>
+      </foreach>
+      )
+    </foreach>
+  </insert>
+</mapper>

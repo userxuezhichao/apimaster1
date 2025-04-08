@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.plan.mapper.ExtTestPlanReportApiScenarioMapper">
+    <select id="countExecuteResult" resultType="io.metersphere.plan.dto.CaseStatusCountMap">
+        select ifnull(tpras.api_scenario_execute_result, 'PENDING') as status, count(id) as count from test_plan_report_api_scenario tpras
+        where tpras.test_plan_report_id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        group by tpras.api_scenario_execute_result
+    </select>
+
+    <select id="getPlanExecuteCases" resultType="io.metersphere.plan.domain.TestPlanReportApiScenario">
+        select  tpas.id as testPlanApiScenarioId, aso.id as apiScenarioId, aso.num as apiScenarioNum, aso.name as apiScenarioName, aso.priority as apiScenarioPriority,
+                tpas.test_plan_collection_id testPlanCollectionId, tpas.grouped as grouped, tpas.environment_id environmentId,
+                if(aso.module_id = 'root','未规划场景', aso.module_id) as apiScenarioModule, tpas.execute_user as apiScenarioExecuteUser,
+                ifnull(tpas.last_exec_result, 'PENDING') as apiScenarioExecuteResult, tpas.last_exec_report_id apiScenarioExecuteReportId, tpas.pos as pos
+        from test_plan_api_scenario tpas join api_scenario aso on aso.id = tpas.api_scenario_id
+        left join api_scenario_module asm on aso.module_id = asm.id
+        where tpas.test_plan_id = #{id} and aso.deleted = false
+        and tpas.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        group by tpas.id
+    </select>
+
+    <select id="getPlanExecuteCaseModules" resultType="io.metersphere.plan.dto.TestPlanBaseModule">
+        select asm.id, asm.name from api_scenario_module asm
+        where asm.id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="list" resultType="io.metersphere.plan.dto.ReportDetailCasePageDTO">
+        <!-- ID、用例名称、所属模块、用例等级、执行人、执行结果、缺陷数、报告ID -->
+        select distinct tpras.api_scenario_id as id, tpras.api_scenario_num as num, tpras.api_scenario_name as name, tpras.test_plan_name as planName, tpras.test_plan_collection_id collectionId, tpc.name collectionName,
+        tpras.api_scenario_module as moduleName, tpras.api_scenario_priority as priority, tpras.api_scenario_execute_report_id reportId, ifnull(tpras.api_scenario_bug_count, 0) as bugCount,
+        ifnull(tpras.api_scenario_execute_result, 'PENDING') as executeResult, tpras.api_scenario_execute_user as executeUser, aso.project_id projectId, asr.request_duration as requestDuration
+        from test_plan_report_api_scenario tpras left join api_scenario aso on tpras.api_scenario_id = aso.id
+        left join test_plan_collection tpc on tpras.test_plan_collection_id = tpc.id
+        left join api_scenario_report asr on tpras.api_scenario_execute_report_id = asr.id
+        where tpras.test_plan_report_id in
+        <foreach collection="request.detailReportIds" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (tpras.api_scenario_num like concat('%', #{request.keyword}, '%')
+            or tpras.api_scenario_name like concat('%', #{request.keyword}, '%')
+            or tpras.api_scenario_module like concat('%', #{request.keyword}, '%'))
+        </if>
+        <if test="request.collectionId != null and request.collectionId != ''">
+            and tpras.test_plan_collection_id = #{request.collectionId}
+        </if>
+        <include refid="filter"/>
+        <choose>
+            <when test="sort != null and sort != ''">
+                order by ${sort}
+            </when>
+            <otherwise>
+                order by tpras.pos desc
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="listCollection" resultType="io.metersphere.plan.dto.response.TestPlanReportDetailCollectionResponse">
+        select tpc.id as id, tpc.name as collectionName, tp.name as planName, tpc.pos as pos, count(tpras.id) as count
+        from test_plan_report_api_scenario tpras
+                 right join test_plan_collection tpc on tpras.test_plan_collection_id = tpc.id and tpc.type = 'SCENARIO'
+                 join test_plan tp on tpc.test_plan_id = tp.id
+        where tpras.test_plan_report_id in
+        <foreach collection="request.detailReportIds" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (tpras.api_scenario_name like concat('%', #{request.keyword}, '%')
+            or tpras.api_scenario_num like concat('%', #{request.keyword}, '%')
+            or tpras.api_scenario_module like concat('%', #{request.keyword}, '%'))
+        </if>
+        <include refid="filter"/>
+        group by tpras.test_plan_collection_id
+    </select>
+
+    <select id="getPlanExecuteCasesId" resultType="java.lang.String">
+        select tpas.id
+        from test_plan_api_scenario tpas
+                 inner join api_scenario aso on aso.id = tpas.api_scenario_id
+        where tpas.test_plan_id = #{id}
+          and aso.deleted = false
+        order by tpas.pos desc
+    </select>
+    <select id="selectExecResultByReportIdAndCollectionId" resultType="java.lang.String">
+        select distinct api_scenario_execute_result
+        from test_plan_report_api_scenario
+        where test_plan_collection_id = #{collectionId}
+          AND test_plan_report_id = #{reportId};
+    </select>
+
+    <sql id="filter">
+        <if test="request.filter != null and request.filter.size() > 0">
+            <foreach collection="request.filter.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <!-- 执行结果 -->
+                        <when test="key == 'executeResult'">
+                            and tpras.api_scenario_execute_result in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 等级 -->
+                        <when test="key == 'priority'">
+                            and tpras.api_scenario_priority in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 计划名称 -->
+                        <when test="key == 'planName'">
+                            and tp.name in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+</mapper>

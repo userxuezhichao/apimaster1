@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.ExtSystemProjectMapper">
+
+
+    <select id="getProjectMemberList" resultType="io.metersphere.system.dto.user.UserExtendDTO">
+        SELECT temp.* , MAX( if (temp.role_id = 'project_admin', true, false)) as adminFlag, MIN(temp.memberTime) as groupTime
+        FROM (
+                 SELECT `user`.* , user_role_relation.role_id, user_role_relation.create_time as memberTime
+                 FROM user_role_relation
+                        LEFT JOIN `user` ON user_role_relation.user_id = `user`.id
+        <where>
+            `user`.deleted = 0
+            <if test="request.projectId != null">
+                and user_role_relation.source_id = #{request.projectId}
+            </if>
+            <if test="request.keyword != null and request.keyword !='' ">
+                and (user.name like CONCAT('%', #{request.keyword},'%')
+                or user.email like CONCAT('%', #{request.keyword},'%')
+                or user.phone like CONCAT('%', #{request.keyword},'%'))
+            </if>
+        </where>
+                 ORDER BY `user_role_relation`.create_time DESC) temp GROUP BY temp.id ORDER BY adminFlag DESC, groupTime DESC
+    </select>
+    <select id="getProjectList" resultType="io.metersphere.system.dto.ProjectDTO">
+        select p.id,
+               p.num,
+               p.organization_id,
+               p.name,
+               p.description,
+               p.create_time,
+               p.update_time,
+               p.create_user,
+               p.delete_time,
+               p.deleted,
+               p.delete_user,
+               p.update_user,
+               p.enable,
+               p.all_resource_pool,
+               o.name as organization_name,
+               p.module_setting
+        FROM project p
+        INNER JOIN organization o on p.organization_id = o.id
+        <include refid="queryWhereCondition"/>
+    </select>
+    <select id="getProjectAdminList" resultType="io.metersphere.system.dto.user.UserExtendDTO">
+        SELECT `user`.*, user_role_relation.source_id
+        FROM user_role_relation
+        LEFT JOIN `user` ON user_role_relation.user_id = `user`.id
+        <where>
+            `user`.deleted = 0
+        <if test="projectIds != null and projectIds.size > 0 ">
+            and user_role_relation.source_id
+            <foreach collection="projectIds" item="projectId" open=" in (" separator="," close=")">
+                #{projectId}
+            </foreach>
+        </if>
+            and user_role_relation.role_id = 'project_admin'
+        </where>
+    </select>
+
+
+    <select id="selectProjectOptions" resultType="io.metersphere.system.dto.OrganizationProjectOptionsDTO">
+        select id, name
+        from project
+        <where>
+            <if test="organizationId != null and organizationId != ''">
+                and organization_id = #{organizationId}
+            </if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <sql id="queryWhereCondition">
+        <where>
+            <if test="request.organizationId != null">
+               p.organization_id = #{request.organizationId}
+            </if>
+            <if test="request.keyword != null and request.keyword !='' ">
+                and (
+                p.name like concat('%', #{request.keyword},'%')
+                or p.num like concat('%', #{request.keyword},'%')
+                )
+            </if>
+            <include refid="filter"/>
+            <include refid="combine">
+                <property name="condition" value="request.combine"/>
+            </include>
+        </where>
+    </sql>
+
+    <sql id="filter">
+        <if test="request.filter != null and request.filter.size() > 0">
+            <foreach collection="request.filter.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='createUser'">
+                            and p.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="combine">
+        <if test="request.combine != null">
+            <if test='${condition}.createUser != null'>
+                and p.create_user
+                <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                    <property name="object" value="${condition}.createUser"/>
+                </include>
+            </if>
+        </if>
+    </sql>
+
+    <select id="getUserAdminList" resultType="io.metersphere.system.dto.user.UserExtendDTO">
+        select
+        u.id,
+        u.NAME,
+        u.email
+        from `user` u left join user_role_relation urr on urr.user_id = u.id
+        where u.deleted = 0 and urr.source_id = #{organizationId}
+        <if test="keyword != null and keyword != ''">
+            and (LOCATE(#{keyword},u.name)>0 or LOCATE(#{keyword},u.email)>0)
+        </if>
+        order by u.create_time desc
+        limit 1000
+
+    </select>
+
+    <select id="getUserMemberList" resultType="io.metersphere.system.dto.user.UserExtendDTO">
+        select distinct   u.id,
+        u.NAME,
+        u.email, count(temp.id) > 0 as memberFlag from
+        user u left join (select * from user_role_relation urr where urr.source_id = #{projectId}) temp on temp.user_id = u.id
+        <where>
+            u.deleted = 0
+            <if test="userIds != null and userIds.size > 0 ">
+                and u.id in
+                <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                    #{userId}
+                </foreach>
+            </if>
+            <if test="keyword != null and keyword != ''">
+                and (LOCATE(#{keyword},u.name)>0 or LOCATE(#{keyword},u.email)>0)
+            </if>
+        </where>
+        group by u.id
+        order by u.create_time desc
+        limit 1000
+    </select>
+    <select id="getProjectExtendDTOList" resultType="io.metersphere.system.dto.ProjectDTO">
+        select p.id, count(distinct temp.id) as memberCount
+        FROM project p
+        LEFT JOIN (SELECT ur.source_id, u.id
+        from user_role_relation ur
+        left join user u on u.id = ur.user_id
+        <where>
+            <if test="projectIds != null and projectIds.size > 0 ">
+                ur.source_id in
+                <foreach collection="projectIds" item="projectId" open="(" separator="," close=")">
+                    #{projectId}
+                </foreach>
+            </if>
+        </where>
+        ) temp on p.id = temp.source_id
+        group by p.id
+    </select>
+    <select id="getProjectResourcePoolDTOList" resultType="io.metersphere.system.dto.ProjectResourcePoolDTO">
+        SELECT p.project_id, t.*
+        from project_test_resource_pool p
+                 INNER JOIN test_resource_pool t on p.test_resource_pool_id = t.id
+        <where>
+            t.enable = true and t.deleted = false
+            <if test="projectIds != null and projectIds.size > 0 ">
+                and p.project_id in
+                <foreach collection="projectIds" item="projectId" open="(" separator="," close=")">
+                    #{projectId}
+                </foreach>
+            </if>
+        </where>
+    </select>
+    <select id="selectModuleSettingsByResourceIdAndTable" resultType="java.lang.String">
+        SELECT module_setting FROM project
+        <where>
+            <if test="resourceTable == 'project' ">
+                id = #{resourceId}
+            </if>
+            <if test="resourceTable != 'project' ">
+                id IN (
+                SELECT project_id FROM ${resourceTable} WHERE id = #{resourceId}
+                )
+            </if>
+        </where>
+    </select>
+
+
+    <select id="getMemberByProjectId" resultType="io.metersphere.system.dto.user.UserExtendDTO">
+        select distinct u.* from user_role_relation urr join `user` u on urr.user_id = u.id
+        where
+        u.deleted = 0 and u.enable = 1
+        <if test="projectId != null and projectId != ''">
+            and urr.source_id = #{projectId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (u.name like concat('%', #{keyword}, '%') or u.email like concat('%', #{keyword}, '%'))
+        </if>
+        order by u.name
+        limit 1000
+    </select>
+
+    <select id="getProjectMemberByUserId" resultType="io.metersphere.system.domain.User">
+        select distinct u.* from user_role_relation urr join `user` u on urr.user_id = u.id
+        where
+        u.deleted = 0
+        <if test="projectId != null and projectId != ''">
+            and urr.source_id = #{projectId}
+        </if>
+        <if test="userIds != null and userIds.size > 0 ">
+            and u.id in
+            <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getEnableProjectMemberByUserId" resultType="io.metersphere.system.domain.User">
+        select distinct u.* from user_role_relation urr join `user` u on urr.user_id = u.id
+        where
+        u.deleted = 0 and u.enable = 1
+        <if test="projectId != null and projectId != ''">
+            and urr.source_id = #{projectId}
+        </if>
+        <if test="userIds != null and userIds.size > 0 ">
+            and u.id in
+            <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getSystemProject" resultType="io.metersphere.system.dto.sdk.OptionDTO">
+        select id, name
+        from project
+        where enable = 1
+        <if test="keyword != null and keyword != ''">
+            and name LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        order by update_time desc
+        limit 1000
+    </select>
+
+
+    <select id="getUserList" resultType="io.metersphere.system.dto.user.UserExtendDTO">
+        select distinct   u.id,
+        u.NAME,
+        u.email, count(temp.id) > 0 as memberFlag from
+        user u left join (select * from user_role_relation urr where urr.source_id = #{projectId}) temp on temp.user_id = u.id
+        <where>
+            u.deleted = 0
+            <if test="userIds != null and userIds.size > 0 ">
+                and u.id in
+                <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                    #{userId}
+                </foreach>
+            </if>
+            <if test="keyword != null and keyword != ''">
+                and (LOCATE(#{keyword},u.name)>0 or LOCATE(#{keyword},u.email)>0)
+            </if>
+        </where>
+        group by u.id
+        order by u.create_time desc
+    </select>
+</mapper>

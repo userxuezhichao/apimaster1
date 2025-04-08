@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.functional.mapper.ExtCaseReviewHistoryMapper">
+
+    <select id="list" resultType="io.metersphere.functional.dto.CaseReviewHistoryDTO">
+        SELECT
+        ch.id,
+        ch.review_id,
+        ch.case_id,
+        ch.status,
+        ch.notifier,
+        ch.create_user,
+        ch.create_time,
+        ch.content,
+        u.name as userName,
+        ux.avatar as userLogo
+        FROM
+        case_review_history ch
+        left join user u on  ch.create_user = u.id
+        left join user_extend ux on  ch.create_user = ux.id
+        where ch.case_id = #{caseId}
+        <if test="reviewId != null and reviewId != ''">
+            and ch.review_id = #{reviewId}
+        </if>
+        and ch.deleted = false
+    </select>
+
+    <select id="resultList" resultType="io.metersphere.functional.dto.CaseReviewHistoryDTO">
+        SELECT
+        ch.id,
+        ch.review_id,
+        ch.case_id,
+        ch.status,
+        ch.notifier,
+        ch.create_user,
+        ch.create_time,
+        ch.content,
+        u.name as userName,
+        ux.avatar as userLogo
+        FROM
+        case_review_history ch
+        left join user u on  ch.create_user = u.id
+        left join user_extend ux on  ch.create_user = ux.id
+        where ch.case_id = #{caseId}
+        <if test="reviewId != null and reviewId != ''">
+            and ch.review_id = #{reviewId}
+        </if>
+        and ch.status != 'UNDER_REVIEWED'
+        and ch.deleted = false
+    </select>
+
+    <select id="getHistoryListWidthAbandoned" resultType="io.metersphere.functional.dto.CaseReviewHistoryDTO">
+        SELECT
+        ch.id,
+        ch.review_id,
+        ch.case_id,
+        ch.status,
+        ch.notifier,
+        ch.create_user,
+        ch.create_time,
+        ch.content,
+        u.name as userName,
+        ux.avatar as userLogo,
+        cr.name as reviewName,
+        u.email as email
+        FROM
+        case_review_history ch
+        left join user u on  ch.create_user = u.id
+        left join user_extend ux on  ch.create_user = ux.id
+        left join case_review cr on  ch.review_id = cr.id
+        where ch.case_id = #{caseId}
+        <if test="reviewId != null and reviewId != ''">
+            and ch.review_id = #{reviewId}
+        </if>
+        and ch.deleted = false
+        order by ch.create_time desc
+    </select>
+
+    <select id="getHistoryListWidthCaseId" resultType="io.metersphere.functional.dto.CaseReviewHistoryDTO">
+        SELECT
+        ch.id,
+        ch.review_id,
+        ch.case_id,
+        ch.status,
+        ch.notifier,
+        ch.create_user,
+        ch.create_time,
+        ch.content,
+        ch.deleted,
+        ch.abandoned,
+        u.name as userName,
+        ux.avatar as userLogo,
+        cr.name as reviewName,
+        u.email as email
+        FROM
+        case_review_history ch
+        left join user u on  ch.create_user = u.id
+        left join user_extend ux on  ch.create_user = ux.id
+        left join case_review cr on  ch.review_id = cr.id
+        where ch.case_id = #{caseId}
+        <if test="reviewId != null and reviewId != ''">
+            and ch.review_id = #{reviewId}
+        </if>
+        order by ch.create_time desc
+    </select>
+
+
+
+    <update id="updateDelete">
+        update case_review_history
+        set deleted = #{delete}
+        where review_id = #{reviewId}
+        <if test="caseIds != null and caseIds.size() > 0">
+            and case_id in
+            <foreach collection="caseIds" item="caseId" separator="," open="(" close=")">
+                #{caseId}
+            </foreach>
+        </if>
+    </update>
+
+    <update id="updateAbandoned">
+        update case_review_history
+        set abandoned = true
+        where case_id = #{caseId}
+        and abandoned = false
+    </update>
+
+
+    <update id="batchUpdateAbandoned">
+        update case_review_history
+        set abandoned = true
+        where abandoned = false
+        <if test="reviewId != null and reviewId != ''">
+            and review_id = #{reviewId}
+        </if>
+        and case_id in
+        <foreach collection="caseIds" item="caseId" separator="," open="(" close=")">
+            #{caseId}
+        </foreach>
+
+    </update>
+
+
+    <select id="getReviewHistoryStatus" resultType="io.metersphere.functional.domain.CaseReviewHistory">
+        SELECT
+            review_id,
+            case_id,
+            STATUS,
+            create_user
+        FROM
+            case_review_history
+        WHERE
+            review_id = #{reviewId}
+          AND case_id IN
+            <foreach collection="caseIds" item="caseId" separator="," open="(" close=")">
+                #{caseId}
+            </foreach>
+          AND deleted = FALSE
+          AND abandoned = FALSE
+          AND status != 'UNDER_REVIEWED'
+        order by create_time desc
+    </select>
+
+</mapper>

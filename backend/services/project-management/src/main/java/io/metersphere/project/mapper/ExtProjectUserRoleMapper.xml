@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.project.mapper.ExtProjectUserRoleMapper">
+    <select id="list" resultType="io.metersphere.project.dto.ProjectUserRoleDTO">
+        select ur.* from user_role ur
+        where ur.type = 'PROJECT' and scope_id in ('global', #{request.projectId})
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            ur.id like concat('%', #{request.keyword}, '%') or
+            ur.name like concat('%', #{request.keyword}, '%')
+            )
+        </if>
+        order by ur.internal desc, ur.scope_id desc, ur.create_time
+    </select>
+
+    <select id="getRelationByRoleIds" resultType="io.metersphere.system.domain.UserRoleRelation">
+        select urr.*
+        from user_role_relation urr
+        left join user u on urr.user_id = u.id
+        where u.deleted = 0 and urr.source_id = #{projectId} and urr.role_id in
+        <foreach collection="roleIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="listProjectRoleMember" resultType="io.metersphere.system.domain.User">
+        select u.*
+        from user_role_relation urr left join user u on urr.user_id = u.id
+        where u.deleted = 0 and urr.source_id = #{request.projectId}
+        and urr.role_id = #{request.userRoleId}
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+                u.name like concat('%', #{request.keyword}, '%')
+                or u.email like concat('%', #{request.keyword}, '%')
+                or u.phone like concat('%', #{request.keyword}, '%')
+            )
+        </if>
+        order by urr.create_time desc
+    </select>
+
+    <select id="getProjectUserList" resultType="io.metersphere.system.domain.User">
+        SELECT distinct
+               u.id,
+               u.NAME,
+               u.email
+        FROM `user` u
+                 LEFT JOIN user_role_relation urr ON u.id = urr.user_id
+        WHERE urr.source_id = #{sourceId}
+          and u.deleted = false
+        order by u.create_time desc
+    </select>
+
+    <select id="getProjectUserSelectList" resultType="io.metersphere.system.dto.sdk.OptionDTO">
+        select u.id,
+               u.name
+        from `user` u
+           left join user_role_relation urr on urr.user_id = u.id
+        where urr.source_id = #{projectId}
+        <if test="keyword != null and keyword != ''">
+            and u.name LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        and u.deleted = false
+        order by u.update_time desc
+        limit 1000
+    </select>
+
+    <select id="getProjectRoleMemberIds" resultType="java.lang.String">
+        select distinct u.id
+        from `user` u
+        left join user_role_relation urr on urr.user_id = u.id
+        where urr.source_id = #{request.projectId} and u.deleted = false
+        <include refid="queryWhereConditionByBaseQueryRequest"/>
+    </select>
+
+    <sql id="queryWhereConditionByBaseQueryRequest">
+        <if test="request.condition.keyword != null and request.condition.keyword != ''">
+            and (
+            u.name like concat('%', #{request.condition.keyword}, '%')
+            or u.email like concat('%', #{request.condition.keyword}, '%')
+            or u.phone like concat('%', #{request.condition.keyword}, '%')
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+    </sql>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <!-- 评审状态 -->
+                        <when test="key=='roleIds'">
+                            and urr.role_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+</mapper>

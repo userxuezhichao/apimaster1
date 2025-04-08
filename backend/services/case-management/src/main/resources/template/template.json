@@ -1,0 +1,64 @@
+{
+    "functionalCaseList": [],
+    "moduleName": "rootNode",
+    "moduleId": "rootNode",
+    "children": [
+        {
+            "functionalCaseList": [
+                {
+                    "id": "1",
+                    "num": 1,
+                    "projectId": "12314",
+                    "name": "",
+                    "tags": "多个｜分隔，非必填",
+                    "caseEditType": "STEP",
+                    "steps": "[{\"num\":1,\"desc\":\"非必填\",\"result\":\"非必填\"},{\"num\":2,\"desc\":\"非必填\",\"result\":\"非必填\"}]",
+                    "textDescription": "",
+                    "expectedResult": "",
+                    "prerequisite": "非必填",
+                    "description": "非必填",
+                    "customFieldDTOList": []
+                },
+                {
+                    "id": "2",
+                    "num": 2,
+                    "projectId": "12314",
+                    "name": "",
+                    "tags": "标签，多个｜分隔，非必填",
+                    "caseEditType": "TEXT",
+                    "steps": "",
+                    "textDescription": "非必填",
+                    "expectedResult": "非必填",
+                    "prerequisite": "非必填",
+                    "description": "非必填",
+                    "customFieldDTOList": []
+                }
+            ],
+            "moduleName": "模块1：若无该模块将自动创建",
+            "moduleId": "module1",
+            "children": [
+                {
+                    "functionalCaseList": [
+                        {
+                            "id": "3",
+                            "num": 3,
+                            "projectId": "12314",
+                            "name": "",
+                            "tags": "多个｜分隔，非必填",
+                            "caseEditType": "STEP",
+                            "steps": "[{\"num\":1,\"desc\":\"非必填\",\"result\":\"非必填\"},{\"num\":2,\"desc\":\"非必填\",\"result\":\"非必填\"}]",
+                            "textDescription": "",
+                            "expectedResult": "",
+                            "prerequisite": "非必填",
+                            "description": "非必填",
+                            "customFieldDTOList": []
+                        }
+                    ],
+                    "moduleName": "模块2：若无该模块将自动创建",
+                    "moduleId": "module2",
+                    "children": []
+                }
+            ]
+        }
+    ]
+}

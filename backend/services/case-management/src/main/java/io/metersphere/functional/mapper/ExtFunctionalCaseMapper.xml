@@ -1,0 +1,1008 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.functional.mapper.ExtFunctionalCaseMapper">
+    <resultMap id="BaseResultMap" type="io.metersphere.functional.domain.FunctionalCase">
+        <id column="id" jdbcType="VARCHAR" property="id" />
+        <result column="num" jdbcType="BIGINT" property="num" />
+        <result column="module_id" jdbcType="VARCHAR" property="moduleId" />
+        <result column="project_id" jdbcType="VARCHAR" property="projectId" />
+        <result column="template_id" jdbcType="VARCHAR" property="templateId" />
+        <result column="name" jdbcType="VARCHAR" property="name" />
+        <result column="review_status" jdbcType="VARCHAR" property="reviewStatus" />
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+        <result column="case_edit_type" jdbcType="VARCHAR" property="caseEditType" />
+        <result column="pos" jdbcType="BIGINT" property="pos" />
+        <result column="version_id" jdbcType="VARCHAR" property="versionId" />
+        <result column="ref_id" jdbcType="VARCHAR" property="refId" />
+        <result column="last_execute_result" jdbcType="VARCHAR" property="lastExecuteResult" />
+        <result column="deleted" jdbcType="BIT" property="deleted" />
+        <result column="public_case" jdbcType="BIT" property="publicCase" />
+        <result column="latest" jdbcType="BIT" property="latest" />
+        <result column="create_user" jdbcType="VARCHAR" property="createUser" />
+        <result column="update_user" jdbcType="VARCHAR" property="updateUser" />
+        <result column="delete_user" jdbcType="VARCHAR" property="deleteUser" />
+        <result column="create_time" jdbcType="BIGINT" property="createTime" />
+        <result column="update_time" jdbcType="BIGINT" property="updateTime" />
+        <result column="delete_time" jdbcType="BIGINT" property="deleteTime" />
+    </resultMap>
+
+    <resultMap id="BaseResultMapDTO" type="io.metersphere.functional.dto.FunctionalCasePageDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <resultMap id="TestCaseProviderDTO" type="io.metersphere.dto.TestCaseProviderDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <select id="getPos" resultType="java.lang.Long">
+        SELECT
+            pos
+        FROM
+            functional_case
+        WHERE
+            project_id = #{projectId}
+        ORDER BY
+            pos DESC
+            LIMIT 1;
+    </select>
+
+
+    <update id="updateFunctionalCaseModule">
+        UPDATE functional_case
+        SET module_id = #{moduleId}
+        WHERE
+            ref_id = #{refId}
+    </update>
+
+
+    <select id="getFunctionalCaseByRefId" resultType="io.metersphere.functional.dto.FunctionalCaseVersionDTO">
+        SELECT
+            id,
+            name,
+            version_id,
+            project_id
+        FROM
+            functional_case
+        WHERE
+            ref_id = #{refId}
+    </select>
+
+    <select id="getFunctionalCaseIds" resultType="java.lang.String">
+        SELECT
+            id
+        FROM
+            functional_case
+        WHERE
+            project_id = #{projectId}
+    </select>
+
+    <update id="removeToTrashByModuleIds" parameterType="java.lang.String">
+        UPDATE functional_case SET deleted = true, module_id = 'root', delete_time = unix_timestamp()*1000, delete_user = #{userId} WHERE module_id IN
+        <foreach collection="moduleIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="checkCaseByModuleIds" resultType="io.metersphere.functional.domain.FunctionalCase">
+        SELECT
+            id, name, module_id, create_user
+        FROM
+            functional_case
+        WHERE
+        deleted = false
+        AND
+            module_id IN
+        <foreach collection="moduleIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+
+    <select id="list" resultMap="BaseResultMapDTO">
+        SELECT
+        functional_case.id,
+        functional_case.num,
+        functional_case.NAME,
+        functional_case.module_id,
+        functional_case.version_id,
+        project_version.name as versionName,
+        functional_case.case_edit_type,
+        functional_case.create_user,
+        functional_case.create_time,
+        functional_case.update_user,
+        functional_case.update_time,
+        functional_case.review_status,
+        functional_case.last_execute_result,
+        functional_case.delete_user,
+        functional_case.delete_time,
+        functional_case.tags,
+        functional_case.project_id
+        FROM
+            functional_case
+        LEFT JOIN project_version ON  functional_case.version_id = project_version.id
+        where functional_case.deleted = #{deleted}
+        and functional_case.project_id = #{request.projectId}
+        <include refid="queryWhereCondition"/>
+        <if test="request.reviewId != null and request.reviewId != ''">
+            AND functional_case.id not in (
+                select case_review_functional_case.case_id from case_review_functional_case where case_review_functional_case.review_id = #{request.reviewId}
+            )
+        </if>
+        <if test="!isRepeat">
+            AND functional_case.id not in (
+            select test_plan_functional_case.functional_case_id from test_plan_functional_case where test_plan_functional_case.test_plan_id = #{request.testPlanId}
+            )
+        </if>
+        <if test="request.excludeIds != null and request.excludeIds.size() > 0">
+            AND functional_case.id not in
+            <foreach collection="request.excludeIds" item="excludeId" separator="," open="(" close=")">
+                #{excludeId}
+            </foreach>
+        </if>
+    </select>
+
+    <update id="recoverCase">
+        UPDATE functional_case
+        SET deleted = false,
+            update_user =  #{userId},
+            update_time = #{time},
+            delete_user = null,
+            delete_time = null
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="recoverCaseByRefIds">
+        UPDATE functional_case
+        SET deleted = false,
+        update_user =  #{userId},
+        update_time = #{time},
+        delete_user = null,
+        delete_time = null
+        WHERE ref_id IN
+        <foreach collection="refIds" item="refId" open="(" separator="," close=")">
+            #{refId}
+        </foreach>
+    </update>
+
+    <sql id="queryWhereCondition">
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and functional_case.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" separator="," open="(" close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            functional_case.name like concat('%', #{request.keyword},'%')
+            or functional_case.num like concat('%', #{request.keyword},'%')
+            or functional_case.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.filter"/>
+        </include>
+        <include refid="combine">
+            <property name="combineSearch" value="request.combineSearch"/>
+        </include>
+        <include refid="queryVersionCondition">
+            <property name="versionTable" value="functional_case"/>
+        </include>
+    </sql>
+
+    <sql id="queryWhereConditionByBaseQueryRequest">
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and functional_case.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" separator="," open="(" close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+        <if test="request.condition.keyword != null and request.condition.keyword != ''">
+            and (
+            functional_case.name like concat('%', #{request.condition.keyword},'%')
+            or functional_case.num like concat('%', #{request.condition.keyword},'%')
+            or functional_case.tags like concat('%', #{request.condition.keyword},'%')
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+        <include refid="combine">
+            <property name="combineSearch" value="request.condition.combineSearch"/>
+        </include>
+        <include refid="queryVersionCondition">
+            <property name="versionTable" value="functional_case"/>
+        </include>
+    </sql>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <!-- 评审状态 -->
+                        <when test="key=='reviewStatus'">
+                            and functional_case.review_status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行结果 -->
+                        <when test="key=='lastExecuteResult'">
+                            and functional_case.last_execute_result in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 版本 -->
+                        <when test="key=='version_id'">
+                            and functional_case.version_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 自定义单选 -->
+                        <when test="key.startsWith('custom_single')">
+                            and functional_case.id in (
+                            select field_id from functional_case_custom_field where concat('custom_single-',field_id) =
+                            #{key}
+                            and trim(both '"' from `value`) in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                        <!-- 自定义多选 -->
+                        <when test="key.startsWith('custom_multiple')">
+                            and functional_case.id in (
+                            select field_id from functional_case_custom_field where concat('custom_multiple-',field_id) =
+                            #{key}
+                            and JSON_CONTAINS(`value`, json_array(#{value}))
+                        </when>
+                        <!-- 用例等级 -->
+                        <when test="key=='caseLevel'">
+                            and functional_case.id in (
+                            select case_id from functional_case_custom_field where `value` in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                        <!-- 更新人 -->
+                        <when test="key=='updateUser'">
+                            and functional_case.update_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 创建人 -->
+                        <when test="key=='createUser'">
+                            and functional_case.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 删除人 -->
+                        <when test="key=='deleteUser'">
+                            and functional_case.delete_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 关联用例的 -->
+                        <when test="key=='associateCase'">
+                            <if test="values.contains('true')">
+                                and functional_case.id in (
+                                select
+                                distinct fct.case_id
+                                from functional_case_test fct
+                                LEFT JOIN functional_case fc ON fc.id = fct.case_id
+                                where fc.deleted = false )
+                            </if>
+                            <if test="values.contains('false')">
+                                and functional_case.id not in (
+                                select
+                                distinct fct.case_id
+                                from functional_case_test fct
+                                LEFT JOIN functional_case fc ON fc.id = fct.case_id
+                                where fc.deleted = false )
+                            </if>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="functional_case.create_user"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'follower'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="functional_case.id"/>
+                                <property name="associationTable" value="functional_case_follower"/>
+                                <property name="associationIdColumn" value="case_id"/>
+                                <property name="searchColumn" value="user_id"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="functional_case"/>
+                        </include>
+                        <!-- 评审结果 -->
+                        <if test="condition.name == 'reviewStatus'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="functional_case.review_status"/>
+                            </include>
+                        </if>
+                        <!-- 执行结果 -->
+                        <if test="condition.name == 'lastExecuteResult'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="functional_case.last_execute_result"/>
+                            </include>
+                        </if>
+                        <!-- 关联需求 -->
+                        <if test="condition.name == 'demand'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="functional_case.id"/>
+                                <property name="associationTable" value="functional_case_demand"/>
+                                <property name="associationIdColumn" value="case_id"/>
+                                <property name="searchColumn" value="demand_name"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'belongTestPlan' and condition.operator == 'EQUALS'">
+                            functional_case.id in (
+                            select functional_case_id from test_plan_functional_case where test_plan_id
+                            = #{condition.value}
+                            )
+                        </if>
+                        <!-- 关联附件 -->
+                        <if test="condition.name == 'attachment'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="functional_case.id"/>
+                                <property name="associationTable" value="functional_case_attachment"/>
+                                <property name="associationIdColumn" value="case_id"/>
+                                <property name="searchColumn" value="file_name"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                            <choose>
+                                <when test="condition.operator == 'NOT_IN' or condition.operator == 'NOT_EQUALS' or condition.operator == 'NOT_CONTAINS'">
+                                    and
+                                </when>
+                                <otherwise>
+                                    or
+                                </otherwise>
+                            </choose>
+                            <include refid="associationAttachmentCondition">
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <include refid="io.metersphere.system.mapper.BaseMapper.customFiledConditions">
+                        <property name="mainIdColumn" value="functional_case.id"/>
+                        <property name="associationTable" value="functional_case_custom_field"/>
+                        <property name="associationIdColumn" value="case_id"/>
+                        <property name="combineSearch" value="${combineSearch}"/>
+                    </include>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+
+    <sql id="associationAttachmentCondition">
+        <choose>
+            <when test="${condition}.operator == 'EMPTY'">
+                functional_case.id not in (
+                    select file_association.source_id from file_association where file_association.source_type = 'FUNCTIONAL_CASE'
+                )
+            </when>
+            <otherwise>
+                (
+                functional_case.id
+                <if test="${condition}.operator == 'NOT_IN' or ${condition}.operator == 'NOT_EQUALS' or ${condition}.operator == 'NOT_CONTAINS'">
+                    not
+                </if>
+                in (
+                    select file_association.source_id from file_association join file_metadata on file_association.file_id = file_metadata.id
+                    and file_association.source_type = 'FUNCTIONAL_CASE' and
+                    <choose>
+                        <when test="${condition}.operator == 'NOT_IN' or ${condition}.operator == 'NOT_EQUALS' or ${condition}.operator == 'NOT_CONTAINS'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationReversalCondition">
+                                <property name="condition" value="${condition}"/>
+                                <property name="column" value="file_metadata.original_name"/>
+                            </include>
+                        </when>
+                        <otherwise>
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="${condition}"/>
+                                <property name="column" value="file_metadata.original_name"/>
+                            </include>
+                        </otherwise>
+                    </choose>
+                    )
+                )
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="queryVersionCondition">
+        <choose>
+            <when test="request.versionId != null and request.versionId != ''">
+                and ${versionTable}.version_id = #{request.versionId}
+            </when>
+            <when test="request.refId != null and request.refId != ''">
+                and ${versionTable}.ref_id = #{request.refId}
+            </when>
+            <otherwise>
+                and ${versionTable}.latest = 1
+            </otherwise>
+        </choose>
+    </sql>
+
+    <select id="getIds" resultType="java.lang.String">
+        SELECT
+            id
+        FROM
+            functional_case
+        WHERE
+            functional_case.project_id = #{projectId}
+            and functional_case.deleted = #{deleted}
+        <include refid="queryWhereConditionByBaseQueryRequest"/>
+    </select>
+
+    <select id="getRefIds" resultType="java.lang.String">
+        SELECT
+            ref_id
+        FROM
+            functional_case
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = #{deleted}
+        group by ref_id
+    </select>
+
+    <update id="batchDelete">
+        update functional_case
+        set deleted = 1,
+        delete_user = #{userId},
+        delete_time = UNIX_TIMESTAMP()*1000
+        where ref_id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = false
+    </update>
+
+    <select id="getLogInfo" resultType="io.metersphere.functional.domain.FunctionalCase">
+        SELECT
+            id,
+            name,
+            project_id
+        from
+            functional_case
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = #{deleted}
+    </select>
+
+
+    <update id="batchMoveModule">
+        update functional_case
+        set module_id = #{request.moduleId},
+            update_user = #{userId},
+            update_time = UNIX_TIMESTAMP()*1000
+        where ref_id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = false
+        and project_id = #{request.projectId}
+    </update>
+
+
+    <select id="getTagsByIds" resultMap="BaseResultMap">
+        select id, tags from functional_case
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = false
+    </select>
+
+
+    <update id="batchUpdate">
+        update functional_case
+        <set>
+            <if test="functionalCase.tags != null and functionalCase.tags != ''">
+                tags = #{functionalCase.tags,typeHandler=io.metersphere.handler.ListTypeHandler},
+            </if>
+            <if test="functionalCase.updateUser != null and functionalCase.updateUser != ''">
+                update_user = #{functionalCase.updateUser},
+            </if>
+            <if test="functionalCase.updateTime != null">
+                update_time = #{functionalCase.updateTime},
+            </if>
+        </set>
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        and deleted = false
+        and project_id = #{functionalCase.projectId}
+    </update>
+
+    <select id="countModuleIdByRequest"  resultType="io.metersphere.project.dto.ModuleCountDTO">
+        SELECT module_id AS moduleId, count(id) AS dataCount
+        FROM functional_case
+        WHERE deleted = #{deleted}
+        AND project_id = #{request.projectId}
+        <include refid="queryWhereCondition"/>
+        <if test="request.reviewId != null and request.reviewId != ''">
+            AND functional_case.id not in (
+            select case_id from case_review_functional_case where review_id = #{request.reviewId}
+            )
+        </if>
+        <if test="request.testPlanId != null and request.testPlanId != ''">
+            AND functional_case.id not in (
+            select test_plan_functional_case.functional_case_id from test_plan_functional_case where test_plan_functional_case.test_plan_id = #{request.testPlanId}
+            )
+        </if>
+        <if test="request.excludeIds != null and request.excludeIds.size() > 0">
+            AND functional_case.id not in
+            <foreach collection="request.excludeIds" item="excludeId" separator="," open="(" close=")">
+                #{excludeId}
+            </foreach>
+        </if>
+        GROUP BY module_id
+    </select>
+
+    <select id="caseCount"
+            resultType="java.lang.Long">
+        SELECT count(id)
+        FROM functional_case
+        WHERE deleted = #{deleted}
+        AND project_id = #{request.projectId}
+        <include refid="queryWhereCondition"/>
+        <if test="request.reviewId != null and request.reviewId != ''">
+            AND functional_case.id not in (
+            select case_id from case_review_functional_case where review_id = #{request.reviewId}
+            )
+        </if>
+        <if test="request.excludeIds != null and request.excludeIds.size() > 0">
+            AND functional_case.id not in
+            <foreach collection="request.excludeIds" item="excludeId" separator="," open="(" close=")">
+                #{excludeId}
+            </foreach>
+        </if>
+    </select>
+
+
+    <select id="getPrePos" resultType="java.lang.Long">
+        select `pos` from functional_case where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &lt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+
+    <select id="getLastPos" resultType="java.lang.Long">
+        select `pos` from functional_case where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &gt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+    <select id="listUnRelatedCaseWithBug" resultMap="TestCaseProviderDTO">
+        select
+        functional_case.id,
+        functional_case.num,
+        functional_case.name,
+        functional_case.project_id,
+        functional_case.tags,
+        pv.name as versionName,
+        functional_case.create_user,
+        u.name as createUserName,
+        functional_case.create_time
+        from functional_case left join project_version pv ON functional_case.version_id = pv.id
+        left join user u ON functional_case.create_user = u.id
+        where functional_case.deleted = #{deleted}
+            and functional_case.project_id = #{request.projectId}
+            and functional_case.id not in
+            (
+                select brc.case_id from bug_relation_case brc where brc.bug_id = #{request.sourceId} and brc.case_type = #{request.sourceType}
+            )
+        <include refid="queryWhereCondition"/>
+        order by
+            <if test="sort != null and sort != ''">
+                functional_case.${sort}
+            </if>
+            <if test="sort == null or sort == ''">
+                functional_case.create_time desc
+            </if>
+    </select>
+
+    <select id="getSelectIdsByAssociateParam" resultType="java.lang.String">
+        select fc.id
+        from functional_case fc
+        where fc.deleted = #{deleted}
+            and fc.project_id = #{request.projectId}
+            and fc.id not in
+            (
+                select brc.case_id from bug_relation_case brc where brc.bug_id = #{request.sourceId} and brc.case_type = #{request.sourceType}
+            )
+        <include refid="queryByAssociateParam"/>
+    </select>
+
+    <sql id="queryByTestCaseProviderParam">
+        <!-- 待补充关联Case弹窗中的高级搜索条件 -->
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+                fc.num like concat('%', #{request.keyword}, '%')
+                or fc.name like concat('%', #{request.keyword}, '%')
+                or fc.tags like concat('%', #{request.keyword}, '%')
+            )
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and fc.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" open="(" separator="," close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="queryByAssociateParam">
+        <!-- 待补充关联Case弹窗中的高级搜索条件 -->
+        <if test="request.condition.keyword != null and request.condition.keyword != ''">
+            and (
+            fc.num like concat('%', #{request.condition.keyword}, '%') or fc.name like concat('%', #{request.condition.keyword}, '%')
+            )
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and fc.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" open="(" separator="," close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="getMinderCaseList" resultType="io.metersphere.functional.dto.FunctionalCaseMindDTO">
+        SELECT
+            fc.id, fc.id as caseId, fc.name, fc.project_id, fc.module_id, fc.template_id, fc.review_status, fc.pos, fc.case_edit_type,
+            fcb.steps, fcb.text_description, fcb.expected_result, fcb.prerequisite, fcb.description
+        FROM
+        functional_case fc
+            LEFT JOIN functional_case_blob fcb ON fcb.id = fc.id
+        WHERE
+            fc.deleted = false
+        AND
+            fc.project_Id = #{request.projectId}
+        AND
+            fc.module_id = #{request.moduleId}
+        order by fc.pos desc
+    </select>
+
+    <select id="getCaseCustomFieldList" resultType="io.metersphere.functional.domain.FunctionalCaseCustomField">
+        SELECT
+            fccf.case_id, fccf.field_id, fccf.value
+        FROM
+            functional_case_custom_field fccf
+                LEFT JOIN functional_case fc ON fccf.case_id = fc.id
+                LEFT JOIN custom_field cf ON cf.id = fccf.field_id
+        WHERE
+            fc.deleted = false
+          AND
+            fc.project_Id = #{request.projectId}
+          AND
+            fc.module_id = #{request.moduleId}
+          AND
+            cf.name = 'functional_priority'
+          AND cf.scene = 'FUNCTIONAL'
+          AND cf.internal= true
+        <if test="fieldIds != null and fieldIds.size() > 0">
+            and fccf.field_id in
+            <foreach collection="fieldIds" item="fieldId" open="(" separator="," close=")">
+                #{fieldId}
+            </foreach>
+        </if>
+        order by fc.pos desc
+    </select>
+
+    <select id="getCaseCustomFieldListByCollection" resultType="io.metersphere.functional.domain.FunctionalCaseCustomField">
+        SELECT distinct
+        fccf.case_id, fccf.field_id, fccf.value
+        FROM
+        functional_case_custom_field fccf
+        LEFT JOIN functional_case fc ON fccf.case_id = fc.id
+        LEFT JOIN test_plan_functional_case tpfc ON tpfc.functional_case_id = fc.id
+        LEFT JOIN custom_field cf ON cf.id = fccf.field_id
+        WHERE
+        fc.deleted = false
+        AND
+        fc.project_Id = #{request.projectId}
+        AND
+        tpfc.test_plan_collection_id = #{request.collectionId}
+        AND
+        tpfc.test_plan_id = #{request.planId}
+        AND
+        cf.name = 'functional_priority'
+        AND cf.scene = 'FUNCTIONAL'
+        AND cf.internal= true
+        <if test="fieldIds != null and fieldIds.size() > 0">
+            and fccf.field_id in
+            <foreach collection="fieldIds" item="fieldId" open="(" separator="," close=")">
+                #{fieldId}
+            </foreach>
+        </if>
+        order by fc.pos desc
+    </select>
+
+
+    <select id="getMinderCaseReviewList" resultType="io.metersphere.functional.dto.FunctionalCaseMindDTO">
+        SELECT
+        crfc.id as id,
+        <if test="viewStatusUserId != null and viewStatusUserId != ''">
+            IFNULL(history.`status`, 'UN_REVIEWED') as reviewStatus,
+        </if>
+        <if test="viewStatusUserId == null or viewStatusUserId == ''">
+            IFNULL(history.`status`, crfc.status) as reviewStatus,
+        </if>
+        fc.module_id as moduleId,
+        fc.name as name,
+        fc.id as caseId,
+        fc.project_id,  fc.template_id, fc.pos, fc.case_edit_type,
+        fcb.steps, fcb.text_description, fcb.expected_result, fcb.prerequisite, fcb.description
+        FROM
+        case_review_functional_case crfc
+        LEFT JOIN functional_case fc ON crfc.case_id = fc.id
+        LEFT JOIN functional_case_blob fcb ON fcb.id = fc.id
+        LEFT JOIN (select  * from (SELECT  crh.case_id, crh.`status`, ROW_NUMBER() OVER (PARTITION BY crh.case_id ORDER BY crh.create_time DESC) as rn from case_review_history crh where crh.review_id = #{request.reviewId} and crh.deleted = false
+        <if test="viewStatusUserId != null and viewStatusUserId != ''">
+            AND crh.create_user = #{viewStatusUserId}
+        </if>
+        <if test="viewStatusUserId == null or viewStatusUserId == ''">
+            AND crh.create_user = null
+        </if>
+        order by crh.create_time desc ) as history_filter WHERE rn = 1 ) as history  ON history.case_id = crfc.case_id
+        WHERE
+        crfc.review_id = #{request.reviewId}
+        AND fc.deleted = #{deleted}
+        <if test="userId != null and userId != ''">
+            AND crfc.case_id in (select crfcu.case_id from case_review_functional_case_user crfcu where crfcu.review_id = #{request.reviewId} and crfcu.user_id = #{userId})
+        </if>
+        AND
+        fc.project_Id = #{request.projectId}
+        AND
+        fc.module_id = #{request.moduleId}
+        order by
+        <if test="sort != null and sort != ''">
+            fc.${sort}
+        </if>
+        <if test="sort == null or sort == ''">
+            fc.pos desc
+        </if>
+    </select>
+
+    <select id="getMinderTestPlanList" resultType="io.metersphere.functional.dto.FunctionalCaseMindDTO">
+        SELECT
+        tpfc.id as id,
+        history.`status` as reviewStatus,
+        fc.module_id as moduleId,
+        fc.name as name,
+        fc.id as caseId,
+        fc.project_id,  fc.template_id, fc.pos, fc.case_edit_type,
+        IFNULL(history.`steps`, fcb.steps) as steps, execute_history.`steps` as executeSteps, fcb.text_description, fcb.expected_result, fcb.prerequisite, fcb.description, history.`content`
+        FROM
+        test_plan_functional_case tpfc
+        LEFT JOIN functional_case fc ON tpfc.functional_case_id = fc.id
+        LEFT JOIN functional_case_blob fcb ON fcb.id = fc.id
+        LEFT JOIN (select  * from (SELECT  tpceh.test_plan_case_id, tpceh.`status`,tpceh.`steps`, tpceh.`content`, ROW_NUMBER() OVER (PARTITION BY tpceh.test_plan_case_id ORDER BY tpceh.create_time DESC) as rn from test_plan_case_execute_history tpceh where tpceh.test_plan_id = #{request.planId} and tpceh.deleted = false
+
+                                   order by tpceh.create_time desc ) as history_filter WHERE rn = 1 ) as history  ON history.test_plan_case_id = tpfc.id
+        LEFT JOIN (select  * from (SELECT  tpceh.test_plan_case_id, tpceh.`status`,tpceh.`steps`, ROW_NUMBER() OVER (PARTITION BY tpceh.test_plan_case_id ORDER BY tpceh.create_time DESC) as rn from test_plan_case_execute_history tpceh where tpceh.test_plan_id = #{request.planId} and tpceh.deleted = false and tpceh.steps IS NOT NULL
+
+                                   order by tpceh.create_time desc ) as history_filter WHERE rn = 1 ) as execute_history  ON execute_history.test_plan_case_id = tpfc.id
+        WHERE
+        tpfc.test_plan_id = #{request.planId}
+        AND fc.deleted = #{deleted}
+        AND
+        fc.project_Id = #{request.projectId}
+        AND
+        fc.module_id = #{request.moduleId}
+        order by
+        <if test="sort != null and sort != ''">
+            fc.${sort}
+        </if>
+        <if test="sort == null or sort == ''">
+            fc.pos desc
+        </if>
+    </select>
+
+    <select id="getMinderCollectionList" resultType="io.metersphere.functional.dto.FunctionalCaseMindDTO">
+        SELECT
+            tpfc.id as id,
+            history.`status` as reviewStatus,
+            fc.module_id as moduleId,
+            fc.name as name,
+            fc.id as caseId,
+            fc.project_id,  fc.template_id, fc.pos, fc.case_edit_type,
+            IFNULL(history.`steps`, fcb.steps) as steps, execute_history.`steps` as executeSteps, fcb.text_description, fcb.expected_result, fcb.prerequisite, fcb.description, history.`content`
+        FROM
+            test_plan_functional_case tpfc
+                LEFT JOIN functional_case fc ON tpfc.functional_case_id = fc.id
+                LEFT JOIN functional_case_blob fcb ON fcb.id = fc.id
+                LEFT JOIN (select  * from (SELECT  tpceh.test_plan_case_id, tpceh.`status`,tpceh.`steps`, tpceh.`content`, ROW_NUMBER() OVER (PARTITION BY tpceh.test_plan_case_id ORDER BY tpceh.create_time DESC) as rn from test_plan_case_execute_history tpceh where tpceh.test_plan_id = #{request.planId} and tpceh.deleted = false
+
+                                           order by tpceh.create_time desc ) as history_filter WHERE rn = 1 ) as history  ON history.test_plan_case_id = tpfc.id
+                LEFT JOIN (select  * from (SELECT  tpceh.test_plan_case_id, tpceh.`status`,tpceh.`steps`, ROW_NUMBER() OVER (PARTITION BY tpceh.test_plan_case_id ORDER BY tpceh.create_time DESC) as rn from test_plan_case_execute_history tpceh where tpceh.test_plan_id = #{request.planId} and tpceh.deleted = false and tpceh.steps IS NOT NULL
+
+                                           order by tpceh.create_time desc ) as history_filter WHERE rn = 1 ) as execute_history  ON execute_history.test_plan_case_id = tpfc.id
+        WHERE
+            tpfc.test_plan_id = #{request.planId}
+          AND fc.deleted = #{deleted}
+          AND
+            tpfc.test_plan_collection_id = #{request.collectionId}
+        order by
+        <if test="sort != null and sort != ''">
+            fc.${sort}
+        </if>
+        <if test="sort == null or sort == ''">
+            fc.pos desc
+        </if>
+    </select>
+
+    <select id="selectBaseMindNodeByProjectId" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
+        SELECT id, name, parent_id AS parentId, 'module' AS type
+        FROM mind_additional_node
+        WHERE project_id = #{projectId}
+        ORDER BY pos
+    </select>
+
+    <select id="selectAllFunctionalCase" resultType="io.metersphere.functional.domain.FunctionalCase">
+        select
+        functional_case.id,
+        functional_case.create_user
+        from functional_case
+        where functional_case.deleted = false
+        and functional_case.project_id = #{projectId}
+        <if test="!isRepeat">
+            AND functional_case.id not in (
+            select test_plan_functional_case.functional_case_id from test_plan_functional_case where test_plan_functional_case.test_plan_id = #{testPlanId}
+            )
+        </if>
+        order by functional_case.pos asc
+    </select>
+
+    <select id="getListBySelectModules" resultType="io.metersphere.functional.domain.FunctionalCase">
+        select
+        functional_case.id,
+        functional_case.create_user,
+        functional_case.pos
+        from functional_case
+        where functional_case.deleted = false
+        and functional_case.project_id = #{projectId}
+        and functional_case.module_id in
+        <foreach collection="moduleIds" item="moduleId" open="(" separator="," close=")">
+            #{moduleId}
+        </foreach>
+        <if test="!isRepeat">
+            AND functional_case.id not in (
+            select functional_case_id from test_plan_functional_case where test_plan_id = #{testPlanId}
+            )
+        </if>
+    </select>
+
+
+    <select id="getListBySelectIds" resultType="io.metersphere.functional.domain.FunctionalCase">
+        select
+        functional_case.id,
+        functional_case.create_user,
+        functional_case.pos
+        from functional_case
+        where functional_case.deleted = false
+        and functional_case.project_id = #{projectId}
+        and functional_case.id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="getStatisticListByProjectId" resultType="io.metersphere.functional.dto.FunctionalCaseStatisticDTO">
+        SELECT
+        fc.id as caseId,
+        fc.review_status as reviewStatus,
+        fccf.field_id as fieldId,
+        fccf.value as priority
+        FROM functional_case fc
+        LEFT JOIN functional_case_custom_field fccf ON fccf.case_id = fc.id
+        LEFT JOIN custom_field cf ON cf.id = fccf.field_id
+        WHERE fc.deleted = false
+        <if test="startTime != null and endTime != null">
+            AND fc.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+          AND fc.project_id = #{projectId}
+          AND cf.name = 'functional_priority'
+          AND cf.scene = 'FUNCTIONAL'
+          AND cf.internal= true
+    </select>
+
+    <select id="caseTestCount"
+            resultType="java.lang.Long">
+        select
+            count(distinct fct.case_id)
+        from functional_case_test fct
+                 LEFT JOIN functional_case fc ON fc.id = fct.case_id
+        where fc.project_id = #{projectId}
+          and fc.deleted = false
+        <if test="startTime != null and endTime != null">
+            AND fc.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+    </select>
+
+    <select id="simpleCaseCount"
+            resultType="java.lang.Long">
+        select
+            count(functional_case.id)
+        from functional_case
+        where functional_case.deleted = false
+          and functional_case.project_id = #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND functional_case.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+    </select>
+
+    <select id="getProjectIdByIds" resultType="io.metersphere.functional.domain.FunctionalCase">
+        select id, project_id from functional_case where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="projectCaseCount"
+            resultType="io.metersphere.project.dto.ProjectCountDTO">
+        SELECT functional_case.project_id as projectId, count(functional_case.id) as count
+        FROM functional_case
+        WHERE functional_case.deleted = false
+        AND functional_case.project_id IN
+        <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+            #{projectId}
+        </foreach>
+        <if test="startTime != null and endTime != null">
+            AND functional_case.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="userId != null and userId != ''">
+            AND functional_case.create_user = #{userId}
+        </if>
+        group by functional_case.project_id;
+    </select>
+
+    <select id="userCreateCaseCount"
+            resultType="io.metersphere.project.dto.ProjectUserCreateCount">
+        SELECT functional_case.create_user as userId, count(functional_case.id) as count
+        FROM functional_case
+        WHERE functional_case.deleted = false
+        AND functional_case.project_id =  #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND functional_case.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="userIds != null and userIds.size() > 0">
+            and functional_case.create_user in
+            <foreach collection="userIds" item="userId" separator="," open="(" close=")">
+                #{userId}
+            </foreach>
+        </if>
+        group by functional_case.create_user;
+    </select>
+
+</mapper>

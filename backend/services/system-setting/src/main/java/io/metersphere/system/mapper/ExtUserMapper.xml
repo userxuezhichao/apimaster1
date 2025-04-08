@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.ExtUserMapper">
+    <select id="getMemberOption" resultType="io.metersphere.system.dto.user.UserExtendDTO">
+        select distinct u.*, count(urr.id) > 0 as memberFlag
+        from `user` u left join user_role_relation urr on urr.user_id = u.id and urr.source_id = #{sourceId}
+        where u.deleted = 0
+        <if test="keyword != null and keyword != ''">
+            and (u.name like concat('%', #{keyword}, '%') or u.email like concat('%', #{keyword}, '%'))
+        </if>
+        group by u.id
+        limit 1000
+    </select>
+
+    <select id="getUserListByOrgId" resultType="io.metersphere.system.domain.User">
+        SELECT DISTINCT
+            u.id,
+            u.NAME,
+            u.email
+        FROM
+            `user` u
+                LEFT JOIN user_role_relation urr ON u.id = urr.user_id
+        WHERE
+            urr.source_id = #{sourceId} and u.deleted = false
+        <if test="keyword != null and keyword != ''">
+            and (LOCATE(#{keyword},name)>0 or LOCATE(#{keyword},email)>0)
+        </if>
+        order by u.create_time desc
+        limit 1000
+    </select>
+
+    <select id="selectUserList" resultType="io.metersphere.system.domain.User">
+        SELECT DISTINCT
+            u.id,
+            u.NAME,
+            u.email
+        FROM
+            `user` u
+        WHERE
+            u.deleted = false
+        <if test="keyword != null and keyword != ''">
+            and (LOCATE(#{keyword},name)>0 or LOCATE(#{keyword},email)>0)
+        </if>
+        order by u.create_time desc
+        limit 1000
+    </select>
+
+    <select id="getRoleUserByParam" resultType="io.metersphere.system.domain.User">
+        select * from user
+        where deleted = 0 and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        <if test="keyword != null and keyword != ''">
+            and (name like concat('%', #{keyword}, '%') or email like concat('%', #{keyword}, '%'))
+        </if>
+        limit 1000
+    </select>
+
+
+    <select id="getUserByPermission" resultType="io.metersphere.system.dto.user.UserDTO">
+        SELECT u.id as id, u.name as name, u.email as email, ue.avatar as avatar
+        FROM user u
+        LEFT JOIN user_extend ue ON u.id = ue.id
+        LEFT JOIN user_role_relation urr ON u.id = urr.user_id
+        WHERE urr.role_id IN (SELECT urp.role_id FROM user_role_permission urp WHERE urp.permission_id = #{permission})
+        AND urr.source_id = #{projectId}
+        <if test="keyword != null and keyword != ''">
+            AND (name LIKE concat('%', #{keyword}, '%') OR email LIKE concat('%', #{keyword}, '%'))
+        </if>
+        GROUP BY urr.user_id
+        limit 1000
+    </select>
+
+    <select id="getUserByKeyword" resultType="io.metersphere.system.dto.user.UserDTO">
+        SELECT u.id as id, u.name as name, u.email as email, ue.avatar as avatar
+        FROM user u
+        LEFT JOIN user_extend ue ON u.id = ue.id
+        LEFT JOIN user_role_relation urr ON u.id = urr.user_id
+        WHERE urr.source_id = #{projectId}
+        <if test="keyword != null and keyword != ''">
+            AND (name LIKE concat('%', #{keyword}, '%') OR email LIKE concat('%', #{keyword}, '%'))
+        </if>
+        and u.deleted = false
+        GROUP BY urr.user_id
+        limit 1000
+    </select>
+
+    <select id="countByIdAndPassword" resultType="java.lang.Long">
+        SELECT count(id)
+        FROM user
+        WHERE id = #{userId}
+          AND password = MD5(#{password})
+    </select>
+    <update id="updatePasswordByUserId">
+        UPDATE user
+        SET password = MD5(#{password})
+        WHERE id = #{userId}
+    </update>
+
+    <select id="gaInstalledTime" resultType="java.lang.Long">
+        SELECT
+            UNIX_TIMESTAMP(installed_on) * 1000  as installed_on
+        FROM metersphere_version
+        WHERE version ='3.0.1.2' and description = 'ga ddl'
+    </select>
+
+    <select id="updateInstalled">
+        update metersphere_version SET description ='ga'
+        WHERE version ='3.0.1.2' and description = 'ga ddl'
+    </select>
+
+    <select id="getMemberList" resultType="io.metersphere.system.dto.user.UserExtendDTO" parameterType="io.metersphere.system.dto.request.MemberRequest">
+        select distinct u.*, count(urr.id) > 0 as memberFlag
+        from `user` u left join user_role_relation urr on urr.user_id = u.id and urr.source_id = #{request.sourceId}
+        where u.deleted = 0
+        <if test="request.keyword != null and request.keyword != ''">
+            and (u.name like concat('%', #{request.keyword}, '%') or u.email like concat('%', #{request.keyword}, '%'))
+        </if>
+        group by u.id
+    </select>
+    <select id="selectSimpleUser" resultType="io.metersphere.system.domain.User">
+        select id,
+        `name` from user
+        where deleted = 0 and enable = 1 and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.plan.mapper.ExtTestPlanReportMapper">
+    <select id="list" resultType="io.metersphere.plan.dto.response.TestPlanReportPageResponse">
+        select tpr.id as id, tpr.name as name, tp.name as planName, tpr.pass_threshold planPassThreshold,
+        tpr.trigger_mode as triggerMode, tpr.exec_status , tpr.result_status as resultStatus,
+        tpr.pass_rate passRate, tpr.create_user createUser, tpr.create_time , tpr.integrated
+        from test_plan_report tpr
+        join test_plan tp on tpr.test_plan_id = tp.id
+        <include refid="queryWhereCondition"/>
+    </select>
+
+    <select id="getReportBatchIdsByParam" resultType="java.lang.String">
+        select tpr.id from test_plan_report tpr
+        join test_plan tp on tpr.test_plan_id = tp.id
+        where tpr.deleted = 0
+        <if test="request.projectId != null and request.projectId != ''">
+            and tpr.project_id = #{request.projectId}
+        </if>
+        <if test="request.condition.keyword != null and request.condition.keyword != ''">
+            and tpr.name like concat('%', #{request.condition.keyword},'%')
+        </if>
+        <include refid="filterByCondition"/>
+        <if test="request.condition.combine != null">
+            <include refid="combine">
+                <property name="combineSearch" value="request.condition.combineSearch"/>
+            </include>
+        </if>
+    </select>
+
+    <select id="selectReportByIds" resultType="io.metersphere.plan.domain.TestPlanReport">
+        select * from test_plan_report where id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+    <select id="getNoticeList" resultType="io.metersphere.system.dto.sdk.ApiReportMessageDTO">
+        select id, name from test_plan_report where id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+    <select id="countReportByTime" resultType="java.lang.Long">
+        select count(report.id)
+        from test_plan_report report
+                 inner join test_plan_report_summary summary
+                            on report.id = summary.test_plan_report_id = report.id
+        where report.start_time &lt;= #{time}
+          and report.project_id = #{projectId}
+    </select>
+    <select id="selectReportIdByProjectIdAndTime" resultType="java.lang.String">
+        select report.id
+        from test_plan_report report
+                 left join test_plan_report_summary summary
+                           on report.id = summary.test_plan_report_id
+        where report.project_id = #{projectId}
+          and report.create_time &lt;= #{time}
+    </select>
+    <select id="selectReportIdTestPlanIds" resultType="java.lang.String">
+        select report.id
+        from test_plan_report report
+        where report.test_plan_id IN
+        <foreach collection="testPlanIds" item="testPlanId" open="(" close=")" separator=",">
+            #{testPlanId}
+        </foreach>
+    </select>
+    <select id="taskCenterlist" resultType="io.metersphere.system.dto.taskcenter.TaskCenterDTO">
+        select
+        tpr.id,
+        tpr.project_id,
+        tpr.integrated,
+        tpr.result_status as status,
+        tpr.exec_status,
+        tpr.start_time AS operationTime,
+        tpr.create_user AS operationName,
+        tpr.trigger_mode,
+        tpr.start_time,
+        '' as parent,
+        project.organization_id,
+        tp.num AS resourceNum,
+        tp.name AS resourceName,
+        tp.id AS resourceId
+        FROM
+        test_plan_report tpr
+        INNER JOIN test_plan tp ON tpr.test_plan_id = tp.id
+        left join project on tpr.project_id = project.id
+        where
+        tpr.start_time BETWEEN #{startTime} AND #{endTime}
+        <!-- 独立报告 && 计划组报告 -->
+        and tpr.id = tpr.parent_id
+        <if test="projectIds != null and projectIds.size() > 0">
+            and
+            tpr.project_id IN
+            <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+                #{projectId}
+            </foreach>
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (tp.num like concat('%', #{request.keyword},'%')
+
+            or tp.name like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <include refid="filter"/>
+    </select>
+
+    <select id="getChildTaskCenter" resultType="io.metersphere.system.dto.taskcenter.TaskCenterDTO">
+        select
+        tpr.id,
+        tpr.project_id,
+        tpr.integrated,
+        tpr.result_status as status,
+        tpr.exec_status,
+        tpr.start_time as operationTime,
+        tpr.create_user as operationName,
+        tpr.trigger_mode,
+        tpr.start_time,
+        tpr.parent_id as parent,
+        project.organization_id,
+        tp.num as resourceNum,
+        tp.name as resourceName,
+        tp.id as resourceId
+        from
+        test_plan_report tpr
+        inner join test_plan tp ON tpr.test_plan_id = tp.id
+        left join project on tpr.project_id = project.id
+        where
+        tpr.id != tpr.parent_id
+        <if test="ids != null and ids.size() > 0">
+            and tpr.parent_id in
+            <foreach collection="ids" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getPlanReportListById"
+            resultType="io.metersphere.plan.dto.response.TestPlanReportDetailResponse">
+
+        SELECT tpr.id,
+        tpr.test_plan_name,
+        tpr.result_status,
+        tpr.pass_rate,
+        tpr.pass_threshold,
+        (tprs.functional_case_count + tprs.api_case_count + tprs.api_scenario_count) as caseTotal,
+        tpr.create_time,
+        tpr.deleted
+
+        from test_plan_report tpr
+        LEFT JOIN test_plan_report_summary tprs on tpr.id = tprs.test_plan_report_id
+        <include refid="queryWhereConditionByParentId"/>
+    </select>
+
+    <select id="getReports" resultType="io.metersphere.api.dto.report.ReportDTO">
+        select
+        distinct tpr.id,
+        tpr.project_id,
+        tpr.integrated,
+        project.organization_id,
+        tp.id AS resourceId
+        FROM
+        test_plan_report tpr
+        INNER JOIN test_plan tp ON tpr.test_plan_id = tp.id
+        left join project on tpr.project_id = project.id
+        where
+        tpr.start_time BETWEEN #{startTime} AND #{endTime}
+        and tpr.exec_status in ('PENDING', 'RUNNING', 'RERUNNING')
+        <if test="ids != null and ids.size() > 0">
+            and tpr.id in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectIds != null and projectIds.size() > 0">
+            and
+            tpr.project_id IN
+            <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+                #{projectId}
+            </foreach>
+        </if>
+        <if test="request.condition.keyword != null and request.condition.keyword != ''">
+            and (tp.num like concat('%', #{request.condition.keyword},'%')
+
+            or tp.name like concat('%', #{request.condition.keyword},'%')
+            )
+        </if>
+        <include refid="filterByCondition"/>
+    </select>
+    <select id="getHistoryDeleted" resultType="io.metersphere.api.dto.definition.ExecuteReportDTO">
+        select distinct tpr.* from test_plan_report tpr INNER JOIN test_plan_report_summary tprs on tpr.id =
+        tprs.test_plan_report_id
+        <if test="ids != null and ids.size() > 0">
+            where tpr.id in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+    <select id="selectByParentIds" resultType="io.metersphere.api.dto.report.ReportDTO">
+        select
+        distinct tpr.id,
+        tpr.project_id,
+        tpr.integrated,
+        project.organization_id,
+        tp.id AS resourceId
+        FROM
+        test_plan_report tpr
+        INNER JOIN test_plan tp ON tpr.test_plan_id = tp.id
+        left join project on tpr.project_id = project.id
+        where
+        tpr.exec_status in ('PENDING', 'RUNNING', 'RERUNNING')
+        and tpr.parent_id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+    <select id="getCaseReports" resultType="io.metersphere.api.dto.report.ReportDTO">
+        SELECT DISTINCT
+        ar.*,
+        project.organization_id,
+        ar.test_plan_case_id AS testPlanId,
+        tprac.test_plan_report_id AS testPlanReportId,
+        ar.test_plan_case_id AS resourceId
+        FROM
+        api_report ar
+        LEFT JOIN project ON ar.project_id = project.id
+        LEFT JOIN test_plan_report_api_case tprac ON ar.id = tprac.api_case_execute_report_id
+        WHERE
+        ar.deleted = FALSE
+        AND ar.plan = 1
+        AND ar.exec_status IN ( 'PENDING', 'RUNNING', 'RERUNNING' )
+        AND tprac.test_plan_report_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+    <select id="getScenarioReports" resultType="io.metersphere.api.dto.report.ReportDTO">
+        SELECT DISTINCT
+        asr.*,
+        project.organization_id,
+        asr.test_plan_scenario_id AS testPlanId,
+        asr.test_plan_scenario_id AS resourceId
+        FROM
+        api_scenario_report asr
+        LEFT JOIN test_plan_report_api_scenario tpras ON asr.id = tpras.api_scenario_execute_report_id
+        LEFT JOIN project ON asr.project_id = project.id
+        WHERE
+        asr.deleted = FALSE
+        AND asr.plan = 1
+        AND asr.exec_status IN ( 'PENDING', 'RUNNING', 'RERUNNING' )
+        AND tpras.test_plan_report_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="getReportsByIds" resultType="io.metersphere.api.dto.report.ReportDTO">
+        select
+        test_plan_report.id,
+        test_plan_report.name,
+        test_plan_report.project_id
+        from test_plan_report where test_plan_report.deleted = false
+        and test_plan_report.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <delete id="deleteGroupReport" parameterType="java.lang.String">
+        delete
+        from test_plan_report
+        where id = #{id}
+           or parent_id = #{id}
+    </delete>
+
+    <update id="batchUpdateExecuteTimeAndStatus" parameterType="java.lang.String">
+        update test_plan_report
+        set start_time = #{startTime}, exec_status = 'RUNNING'
+        where id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </update>
+
+    <sql id="queryWhereConditionByParentId">
+        <where>
+            <if test="request.reportId != null and request.reportId != ''">
+                and tpr.parent_id = #{request.reportId} and tpr.integrated = false
+            </if>
+            <if test="request.keyword != null and request.keyword != ''">
+                and tpr.test_plan_name like concat('%', #{request.keyword},'%')
+            </if>
+            <include refid="filter"/>
+            <!--<include refid="combine">
+                <property name="condition" value="request.combine"/>
+                <property name="searchMode" value="request.searchMode"/>
+                <property name="combineTag" value="request.combine.tag"/>
+            </include>-->
+            <include refid="combine">
+                <property name="combineSearch" value="request.combineSearch"/>
+            </include>
+        </where>
+    </sql>
+
+    <sql id="queryWhereCondition">
+        <where>
+            tpr.deleted = 0
+            and tpr.result_status in ('SUCCESS', 'ERROR', 'FAKE_ERROR')
+            <if test="request.projectId != null and request.projectId != ''">
+                and tpr.project_id = #{request.projectId}
+            </if>
+            <if test="request.keyword != null and request.keyword != ''">
+                and tpr.name like concat('%', #{request.keyword},'%')
+            </if>
+            <include refid="filter"/>
+            <!--<include refid="combine">
+                <property name="condition" value="request.combine"/>
+                <property name="searchMode" value="request.searchMode"/>
+                <property name="combineTag" value="request.combine.tag"/>
+            </include>-->
+            <include refid="combine">
+                <property name="combineSearch" value="request.combineSearch"/>
+            </include>
+        </where>
+    </sql>
+
+    <sql id="filter">
+        <if test="request.filter != null and request.filter.size() > 0">
+            <foreach collection="request.filter.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='integrated'">
+                            and tpr.integrated in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                <choose>
+                                    <when test="value == 'true'">1</when>
+                                    <when test="value == 'false'">0</when>
+                                    <otherwise>0</otherwise>
+                                </choose>
+                            </foreach>
+                        </when>
+                        <!-- 触发方式 -->
+                        <when test="key == 'triggerMode'">
+                            and tpr.trigger_mode in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行状态 -->
+                        <when test="key == 'execStatus'">
+                            and tpr.exec_status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行结果 -->
+                        <when test="key == 'resultStatus' || key == 'status'">
+                            and tpr.result_status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 项目id -->
+                        <when test="key=='projectIds'">
+                            and tpr.project_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <!-- 组织id -->
+                        <when test="key=='organizationIds'">
+                            and project.organization_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="filterByCondition">
+        <if test="request.condition.filter != null and request.condition.filter.size() > 0">
+            <foreach collection="request.condition.filter.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='integrated'">
+                            and tpr.integrated in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                <choose>
+                                    <when test="value == 'true'">1</when>
+                                    <when test="value == 'false'">0</when>
+                                    <otherwise>0</otherwise>
+                                </choose>
+                            </foreach>
+                        </when>
+                        <!-- 触发方式 -->
+                        <when test="key == 'triggerMode'">
+                            and tpr.trigger_mode in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行状态 -->
+                        <when test="key == 'execStatus'">
+                            and tpr.exec_status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行结果 -->
+                        <when test="key == 'resultStatus'">
+                            and tpr.result_status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <!--<sql id="combine">
+        <if test="request.combine != null">
+            and (
+            &lt;!&ndash; 任意/所有拼接 &ndash;&gt;
+            <include refid="prefixMode">
+                <property name="searchMode" value="${searchMode}"/>
+            </include>
+            &lt;!&ndash; 名称 &ndash;&gt;
+            <if test='${condition}.name != null'>
+                <include refid="queryType">
+                    <property name="searchMode" value="${searchMode}"/>
+                </include>
+                tpr.name
+                <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                    <property name="object" value="${condition}.name"/>
+                </include>
+            </if>
+            &lt;!&ndash; 触发方式 &ndash;&gt;
+            <if test='${condition}.triggerMode != null'>
+                <include refid="queryType">
+                    <property name="searchMode" value="${searchMode}"/>
+                </include>
+                tpr.trigger_mode
+                <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                    <property name="object" value="${condition}.triggerMode"/>
+                </include>
+            </if>
+            &lt;!&ndash; 执行状态 &ndash;&gt;
+            <if test='${condition}.executeStatus != null'>
+                <include refid="queryType">
+                    <property name="searchMode" value="${searchMode}"/>
+                </include>
+                tpr.exec_status
+                <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                    <property name="object" value="${condition}.executeStatus"/>
+                </include>
+            </if>
+            &lt;!&ndash; 执行结果 &ndash;&gt;
+            <if test='${condition}.resultStatus != null'>
+                <include refid="queryType">
+                    <property name="searchMode" value="${searchMode}"/>
+                </include>
+                tpr.result_status
+                <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                    <property name="object" value="${condition}.resultStatus"/>
+                </include>
+            </if>
+            )
+        </if>
+    </sql>-->
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="tpr.create_user"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="tpr"/>
+                        </include>
+                        <!-- 报告类型 -->
+                        <if test="condition.name == 'integrated'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="tpr.integrated"/>
+                            </include>
+                        </if>
+                        <!-- 测试计划名称 -->
+                        <if test="condition.name == 'testPlanName'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="tpr.test_plan_name"/>
+                            </include>
+                        </if>
+                        <!-- 执行结果 -->
+                        <if test="condition.name == 'resultStatus'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="tpr.result_status"/>
+                            </include>
+                        </if>
+                        <!-- 通过率 -->
+                        <if test="condition.name == 'passRate'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="tpr.pass_rate"/>
+                            </include>
+                        </if>
+                        <!-- 触发方式 -->
+                        <if test="condition.name == 'triggerMode'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="tpr.trigger_mode"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+
+
+   <!-- <sql id="prefixMode">
+        <choose>
+            <when test='${searchMode} == "AND"'>
+                1 = 1
+            </when>
+            <when test='${searchMode} == "OR"'>
+                1 = 2
+            </when>
+        </choose>
+    </sql>-->
+
+   <!-- <sql id="queryType">
+        <choose>
+            <when test='${searchMode} == "AND"'>
+                and
+            </when>
+            <when test='${searchMode} == "OR"'>
+                or
+            </when>
+        </choose>
+    </sql>-->
+
+
+    <select id="getChildrenReport" resultType="io.metersphere.plan.domain.TestPlanReport">
+        select id from test_plan_report where parent_id = #{reportId} and id != #{reportId} order by test_plan_report.create_time desc
+    </select>
+
+    <select id="getPlanChildrenTask" resultType="io.metersphere.plan.domain.TestPlanReport">
+        select test_plan_report.id, test_plan.name from test_plan_report inner join test_plan on test_plan_report.test_plan_id = test_plan.id
+        where parent_id = #{reportId} and test_plan_report.id != #{reportId} and integrated = false order by test_plan_report.create_time desc
+    </select>
+
+    <update id="resetRerunReport">
+        update test_plan_report set exec_status = 'RUNNING', end_time = null where id = #{reportId} or parent_id = #{reportId}
+    </update>
+</mapper>

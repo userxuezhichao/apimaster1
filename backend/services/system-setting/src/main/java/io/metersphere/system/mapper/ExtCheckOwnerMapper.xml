@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.ExtCheckOwnerMapper">
+    <select id="checkoutOwner" resultType="boolean">
+        SELECT count(1) > 0
+        FROM user_role_relation
+        WHERE source_id IN (SELECT project_id
+        FROM ${table} JOIN project ON ${table}.project_id = project.id AND project.enable = TRUE
+        WHERE ${table}.id IN
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>)
+        AND user_id = #{userId}
+    </select>
+
+    <select id="checkoutRelationOwner" resultType="boolean">
+        SELECT count(1) > 0
+        FROM user_role_relation
+        WHERE source_id IN (SELECT project_id
+        FROM ${table} JOIN ${relationTable} ON ${table}.id = ${relationTable}.${table}_id
+        JOIN project ON ${table}.project_id = project.id AND project.enable = TRUE
+        WHERE ${relationTable}.id IN
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>)
+        AND user_id = #{userId}
+    </select>
+
+    <select id="checkoutOrganizationOwner" resultType="boolean">
+        SELECT count(1) > 0
+        FROM user_role_relation
+        WHERE source_id IN (SELECT organization_id
+        FROM ${table} JOIN organization ON ${table}.organization_id = organization.id AND organization.enable = TRUE
+        WHERE ${table}.id IN
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>)
+        AND user_id = #{userId}
+    </select>
+
+    <select id="checkoutOrganization" resultType="boolean">
+        SELECT count(1) > 0
+        FROM user_role_relation
+        WHERE source_id IN (SELECT id
+        FROM organization
+        WHERE organization.enable = TRUE
+        AND organization.id IN
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>)
+        AND user_id = #{userId}
+    </select>
+
+    <select id="checkoutOrganizationOwnerByScope" resultType="boolean">
+        SELECT count(1) > 0
+        FROM user_role_relation
+        WHERE source_id IN (SELECT ${column}
+        FROM ${table} JOIN organization ON ${table}.${column} = organization.id AND organization.enable = TRUE
+        WHERE ${table}.id IN
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>)
+        AND user_id = #{userId}
+    </select>
+
+    <select id="checkoutProjectOwnerByScope" resultType="boolean">
+        SELECT count(1) > 0
+        FROM user_role_relation
+        WHERE source_id IN (SELECT ${column}
+        FROM ${table} JOIN project ON ${table}.${column} = project.id AND project.enable = TRUE
+        WHERE ${table}.id IN
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>)
+        AND user_id = #{userId}
+    </select>
+</mapper>

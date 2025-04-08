@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.plan.mapper.TestPlanReportBugMapper">
+  <resultMap id="BaseResultMap" type="io.metersphere.plan.domain.TestPlanReportBug">
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="test_plan_report_id" jdbcType="VARCHAR" property="testPlanReportId" />
+    <result column="bug_id" jdbcType="VARCHAR" property="bugId" />
+    <result column="bug_num" jdbcType="BIGINT" property="bugNum" />
+    <result column="bug_title" jdbcType="VARCHAR" property="bugTitle" />
+    <result column="bug_status" jdbcType="VARCHAR" property="bugStatus" />
+    <result column="bug_handle_user" jdbcType="VARCHAR" property="bugHandleUser" />
+    <result column="bug_case_count" jdbcType="BIGINT" property="bugCaseCount" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, test_plan_report_id, bug_id, bug_num, bug_title, bug_status, bug_handle_user, 
+    bug_case_count
+  </sql>
+  <select id="selectByExample" parameterType="io.metersphere.plan.domain.TestPlanReportBugExample" resultMap="BaseResultMap">
+    select
+    <if test="distinct">
+      distinct
+    </if>
+    <include refid="Base_Column_List" />
+    from test_plan_report_bug
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from test_plan_report_bug
+    where id = #{id,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
+    delete from test_plan_report_bug
+    where id = #{id,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="io.metersphere.plan.domain.TestPlanReportBugExample">
+    delete from test_plan_report_bug
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="io.metersphere.plan.domain.TestPlanReportBug">
+    insert into test_plan_report_bug (id, test_plan_report_id, bug_id, 
+      bug_num, bug_title, bug_status, 
+      bug_handle_user, bug_case_count)
+    values (#{id,jdbcType=VARCHAR}, #{testPlanReportId,jdbcType=VARCHAR}, #{bugId,jdbcType=VARCHAR}, 
+      #{bugNum,jdbcType=BIGINT}, #{bugTitle,jdbcType=VARCHAR}, #{bugStatus,jdbcType=VARCHAR}, 
+      #{bugHandleUser,jdbcType=VARCHAR}, #{bugCaseCount,jdbcType=BIGINT})
+  </insert>
+  <insert id="insertSelective" parameterType="io.metersphere.plan.domain.TestPlanReportBug">
+    insert into test_plan_report_bug
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="testPlanReportId != null">
+        test_plan_report_id,
+      </if>
+      <if test="bugId != null">
+        bug_id,
+      </if>
+      <if test="bugNum != null">
+        bug_num,
+      </if>
+      <if test="bugTitle != null">
+        bug_title,
+      </if>
+      <if test="bugStatus != null">
+        bug_status,
+      </if>
+      <if test="bugHandleUser != null">
+        bug_handle_user,
+      </if>
+      <if test="bugCaseCount != null">
+        bug_case_count,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=VARCHAR},
+      </if>
+      <if test="testPlanReportId != null">
+        #{testPlanReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="bugId != null">
+        #{bugId,jdbcType=VARCHAR},
+      </if>
+      <if test="bugNum != null">
+        #{bugNum,jdbcType=BIGINT},
+      </if>
+      <if test="bugTitle != null">
+        #{bugTitle,jdbcType=VARCHAR},
+      </if>
+      <if test="bugStatus != null">
+        #{bugStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="bugHandleUser != null">
+        #{bugHandleUser,jdbcType=VARCHAR},
+      </if>
+      <if test="bugCaseCount != null">
+        #{bugCaseCount,jdbcType=BIGINT},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="io.metersphere.plan.domain.TestPlanReportBugExample" resultType="java.lang.Long">
+    select count(*) from test_plan_report_bug
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update test_plan_report_bug
+    <set>
+      <if test="record.id != null">
+        id = #{record.id,jdbcType=VARCHAR},
+      </if>
+      <if test="record.testPlanReportId != null">
+        test_plan_report_id = #{record.testPlanReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.bugId != null">
+        bug_id = #{record.bugId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.bugNum != null">
+        bug_num = #{record.bugNum,jdbcType=BIGINT},
+      </if>
+      <if test="record.bugTitle != null">
+        bug_title = #{record.bugTitle,jdbcType=VARCHAR},
+      </if>
+      <if test="record.bugStatus != null">
+        bug_status = #{record.bugStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="record.bugHandleUser != null">
+        bug_handle_user = #{record.bugHandleUser,jdbcType=VARCHAR},
+      </if>
+      <if test="record.bugCaseCount != null">
+        bug_case_count = #{record.bugCaseCount,jdbcType=BIGINT},
+      </if>
+    </set>
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update test_plan_report_bug
+    set id = #{record.id,jdbcType=VARCHAR},
+      test_plan_report_id = #{record.testPlanReportId,jdbcType=VARCHAR},
+      bug_id = #{record.bugId,jdbcType=VARCHAR},
+      bug_num = #{record.bugNum,jdbcType=BIGINT},
+      bug_title = #{record.bugTitle,jdbcType=VARCHAR},
+      bug_status = #{record.bugStatus,jdbcType=VARCHAR},
+      bug_handle_user = #{record.bugHandleUser,jdbcType=VARCHAR},
+      bug_case_count = #{record.bugCaseCount,jdbcType=BIGINT}
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="io.metersphere.plan.domain.TestPlanReportBug">
+    update test_plan_report_bug
+    <set>
+      <if test="testPlanReportId != null">
+        test_plan_report_id = #{testPlanReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="bugId != null">
+        bug_id = #{bugId,jdbcType=VARCHAR},
+      </if>
+      <if test="bugNum != null">
+        bug_num = #{bugNum,jdbcType=BIGINT},
+      </if>
+      <if test="bugTitle != null">
+        bug_title = #{bugTitle,jdbcType=VARCHAR},
+      </if>
+      <if test="bugStatus != null">
+        bug_status = #{bugStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="bugHandleUser != null">
+        bug_handle_user = #{bugHandleUser,jdbcType=VARCHAR},
+      </if>
+      <if test="bugCaseCount != null">
+        bug_case_count = #{bugCaseCount,jdbcType=BIGINT},
+      </if>
+    </set>
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="io.metersphere.plan.domain.TestPlanReportBug">
+    update test_plan_report_bug
+    set test_plan_report_id = #{testPlanReportId,jdbcType=VARCHAR},
+      bug_id = #{bugId,jdbcType=VARCHAR},
+      bug_num = #{bugNum,jdbcType=BIGINT},
+      bug_title = #{bugTitle,jdbcType=VARCHAR},
+      bug_status = #{bugStatus,jdbcType=VARCHAR},
+      bug_handle_user = #{bugHandleUser,jdbcType=VARCHAR},
+      bug_case_count = #{bugCaseCount,jdbcType=BIGINT}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <insert id="batchInsert" parameterType="map">
+    insert into test_plan_report_bug
+    (id, test_plan_report_id, bug_id, bug_num, bug_title, bug_status, bug_handle_user, 
+      bug_case_count)
+    values
+    <foreach collection="list" item="item" separator=",">
+      (#{item.id,jdbcType=VARCHAR}, #{item.testPlanReportId,jdbcType=VARCHAR}, #{item.bugId,jdbcType=VARCHAR}, 
+        #{item.bugNum,jdbcType=BIGINT}, #{item.bugTitle,jdbcType=VARCHAR}, #{item.bugStatus,jdbcType=VARCHAR}, 
+        #{item.bugHandleUser,jdbcType=VARCHAR}, #{item.bugCaseCount,jdbcType=BIGINT})
+    </foreach>
+  </insert>
+  <insert id="batchInsertSelective" parameterType="map">
+    insert into test_plan_report_bug (
+    <foreach collection="selective" item="column" separator=",">
+      ${column.escapedColumnName}
+    </foreach>
+    )
+    values
+    <foreach collection="list" item="item" separator=",">
+      (
+      <foreach collection="selective" item="column" separator=",">
+        <if test="'id'.toString() == column.value">
+          #{item.id,jdbcType=VARCHAR}
+        </if>
+        <if test="'test_plan_report_id'.toString() == column.value">
+          #{item.testPlanReportId,jdbcType=VARCHAR}
+        </if>
+        <if test="'bug_id'.toString() == column.value">
+          #{item.bugId,jdbcType=VARCHAR}
+        </if>
+        <if test="'bug_num'.toString() == column.value">
+          #{item.bugNum,jdbcType=BIGINT}
+        </if>
+        <if test="'bug_title'.toString() == column.value">
+          #{item.bugTitle,jdbcType=VARCHAR}
+        </if>
+        <if test="'bug_status'.toString() == column.value">
+          #{item.bugStatus,jdbcType=VARCHAR}
+        </if>
+        <if test="'bug_handle_user'.toString() == column.value">
+          #{item.bugHandleUser,jdbcType=VARCHAR}
+        </if>
+        <if test="'bug_case_count'.toString() == column.value">
+          #{item.bugCaseCount,jdbcType=BIGINT}
+        </if>
+      </foreach>
+      )
+    </foreach>
+  </insert>
+</mapper>

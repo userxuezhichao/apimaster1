@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.api.mapper.ExtApiDefinitionMockMapper">
+
+    <resultMap id="ApiDefinitionMockDTO" type="io.metersphere.api.dto.definition.ApiDefinitionMockDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <resultMap id="BaseResultMap" type="io.metersphere.api.domain.ApiDefinitionMock">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <select id="list" resultMap="ApiDefinitionMockDTO">
+        select
+        m.id, m.create_time, m.update_time, m.create_user, m.`name`, m.tags, m.`enable`, m.expect_num, m.project_id, m.status_code,
+        m.api_definition_id, u.name as create_user_name, d.path as api_path, d.method as apiMethod, d.protocol as protocol
+        from api_definition_mock m
+        left join `api_definition` d on d.id = m.api_definition_id
+        left join `user` u on u.id = m.create_user
+        <where>
+            <include refid="queryWhereCondition"/>
+        </where>
+
+    </select>
+    <select id="getIdsByApiIds" resultType="java.lang.String">
+        select
+        m.id
+        from api_definition_mock m
+        where m.api_definition_id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="getIds" resultType="java.lang.String">
+        SELECT
+        m.id
+        FROM
+        api_definition_mock m
+        INNER JOIN api_definition a ON m.api_definition_id = a.id
+
+        <include refid="queryWhereConditionByBatch"/>
+    </select>
+    <select id="getTagsByIds" resultMap="BaseResultMap">
+        SELECT
+        m.id, m.tags
+        FROM
+        api_definition_mock m
+        WHERE m.id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="getMockInfoByIds" resultType="io.metersphere.api.domain.ApiDefinitionMock">
+        SELECT
+        m.id, m.name
+        FROM
+        api_definition_mock m
+        WHERE m.id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <resultMap id="ApiMockDetailMap" type="io.metersphere.api.dto.definition.ApiMockWithBlob">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler"/>
+        <result column="matching" jdbcType="LONGVARBINARY" property="matching"/>
+        <result column="response" jdbcType="LONGVARBINARY" property="response"/>
+    </resultMap>
+    <select id="selectAllDetailByApiIds" resultMap="ApiMockDetailMap">
+        SELECT apiMock.*,mockConfig.matching,mockConfig.response
+        FROM api_definition_mock apiMock
+        INNER JOIN api_definition_mock_config mockConfig ON apiMock.id = mockConfig.id
+        WHERE apiMock.api_definition_id IN
+        <foreach collection="apiIds" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <sql id="queryWhereConditionByBatch">
+        <if test="request.protocols != null and request.protocols.size() > 0">
+            and a.protocol in
+            <foreach collection="request.protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+
+        <if test="request.apiDefinitionId != null and request.apiDefinitionId!=''">
+            and m.api_definition_id = #{request.apiDefinitionId}
+        </if>
+        <if test="request.projectId != null and request.projectId!=''">
+            and m.project_id = #{request.projectId}
+        </if>
+        <if test="request.condition.keyword != null and request.condition.keyword !=''">
+            and (
+            m.name like concat('%', #{request.condition.keyword},'%')
+            or m.expect_num like concat('%', #{request.condition.keyword},'%')
+            or a.path like concat('%', #{request.condition.keyword},'%')
+            or m.tags like concat('%', #{request.condition.keyword},'%')
+            )
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and a.module_id in
+            <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
+                #{nodeId}
+            </foreach>
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+
+        <include refid="combine">
+            <property name="combineSearch" value="request.condition.combineSearch"/>
+        </include>
+    </sql>
+
+
+    <sql id="queryWhereCondition">
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            m.expect_num like concat('%', #{request.keyword},'%')
+            or m.name like concat('%', #{request.keyword},'%')
+            or d.path like concat('%', #{request.keyword},'%')
+            or m.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <if test="request.projectId != null and request.projectId != ''">
+            and m.project_id = #{request.projectId}
+        </if>
+        <if test="request.apiDefinitionId != null and request.apiDefinitionId != ''">
+            and m.api_definition_id = #{request.apiDefinitionId}
+        </if>
+        <if test="request.protocols != null and request.protocols.size() > 0">
+            and d.protocol in
+            <foreach collection="request.protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and d.module_id in
+            <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
+                #{nodeId}
+            </foreach>
+        </if>
+
+
+        <include refid="filters">
+            <property name="filter" value="request.filter"/>
+        </include>
+
+        <include refid="combine">
+            <property name="combineSearch" value="request.combineSearch"/>
+        </include>
+    </sql>
+
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='enable'">
+                            and m.enable in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='create_user'">
+                            and m.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="m.create_user"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="m"/>
+                        </include>
+                        <!-- ID -->
+                        <if test="condition.name == 'expectNum'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="m.expect_num"/>
+                            </include>
+                        </if>
+                        <!-- 协议 -->
+                        <if test="condition.name == 'protocol'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="d.protocol"/>
+                            </include>
+                        </if>
+                        <!-- 请求类型 -->
+                        <if test="condition.name == 'apiMethod'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="d.method"/>
+                            </include>
+                        </if>
+                        <!-- 状态 -->
+                        <if test="condition.name == 'enable'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="m.enable"/>
+                            </include>
+                        </if>
+                        <!-- 路径 -->
+                        <if test="condition.name == 'apiPath'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="d.path"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+</mapper>

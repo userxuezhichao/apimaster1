@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.project.mapper.ExtBaseProjectVersionMapper">
+
+    <select id="getDefaultVersion" resultType="java.lang.String">
+        select id from project_version where project_id = #{projectId} and latest = TRUE LIMIT 1
+    </select>
+
+    <select id="getVersionByIds" resultType="io.metersphere.project.domain.ProjectVersion">
+        select id, name from project_version where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

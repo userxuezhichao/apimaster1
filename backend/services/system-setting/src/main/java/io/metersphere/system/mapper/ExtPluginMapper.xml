@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.ExtPluginMapper">
+    <select id="getPlugins" resultType="io.metersphere.system.dto.PluginDTO">
+        SELECT
+        <include refid="io.metersphere.system.mapper.PluginMapper.Base_Column_List"/>
+        FROM
+        plugin
+    </select>
+
+
+    <select id="selectPluginOptions" resultType="io.metersphere.system.dto.sdk.OptionDTO">
+        SELECT id, name
+        FROM plugin
+        WHERE id IN
+        <foreach collection="list" item="id" index="index"
+                 open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

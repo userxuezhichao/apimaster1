@@ -1,0 +1,69 @@
+[
+  {
+    "id": "CASE_MANAGEMENT",
+    "name": "permission.case_management.name",
+    "type": "PROJECT",
+    "children": [
+      {
+        "id": "FUNCTIONAL_CASE",
+        "name": "permission.functional_case.name",
+        "permissions": [
+          {
+            "id": "FUNCTIONAL_CASE:READ"
+          },
+          {
+            "id": "FUNCTIONAL_CASE:READ+ADD"
+          },
+          {
+            "id": "FUNCTIONAL_CASE:READ+UPDATE"
+          },
+          {
+            "id": "FUNCTIONAL_CASE:READ+DELETE",
+            "name": "permission.api_definition.delete_and_recover"
+          },
+          {
+            "id": "FUNCTIONAL_CASE:READ+COMMENT",
+            "name": "permission.functional_case.comment"
+          },
+          {
+            "id": "FUNCTIONAL_CASE:READ+IMPORT"
+          },
+          {
+            "id": "FUNCTIONAL_CASE:READ+EXPORT"
+          },
+          {
+            "id": "FUNCTIONAL_CASE:READ+MINDER",
+            "name": "permission.functional_case.minder"
+          }
+        ]
+      },
+      {
+        "id": "CASE_REVIEW",
+        "name": "permission.case_review.name",
+        "permissions": [
+          {
+            "id": "CASE_REVIEW:READ"
+          },
+          {
+            "id": "CASE_REVIEW:READ+ADD"
+          },
+          {
+            "id": "CASE_REVIEW:READ+UPDATE"
+          },
+          {
+            "id": "CASE_REVIEW:READ+DELETE"
+          },
+          {
+            "id": "CASE_REVIEW:READ+REVIEW",
+            "name": "permission.case_review.review"
+          },
+          {
+            "id": "CASE_REVIEW:READ+RELEVANCE",
+            "name": "permission.case_review.relevance"
+          }
+        ]
+      }
+    ],
+    "order": 6
+  }
+]

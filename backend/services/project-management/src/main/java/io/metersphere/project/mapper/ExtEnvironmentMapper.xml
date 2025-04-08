@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.project.mapper.ExtEnvironmentMapper">
+    <update id="updatePos">
+        UPDATE
+        environment
+        SET pos =#{pos}
+        WHERE id = #{id}
+    </update>
+    <update id="updateGroupPos">
+        UPDATE
+        environment_group
+        SET pos =#{pos}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectByKeyword" resultType="io.metersphere.sdk.domain.Environment">
+        SELECT
+        <if test="selectId">
+            id
+        </if>
+        <if test="!selectId">
+            *
+        </if>
+        FROM environment
+        WHERE environment.project_id = #{projectId}
+        <if test="keyword != null and keyword != ''">
+            AND (
+            id = #{keyword} OR
+            (name LIKE CONCAT('%', #{keyword}, '%'))
+            )
+
+        </if>
+            ORDER BY pos DESC
+    </select>
+    <select id="groupList" resultType="io.metersphere.sdk.domain.EnvironmentGroup">
+        SELECT
+        *
+        FROM environment_group
+        WHERE environment_group.project_id = #{projectId}
+        <if test="keyword != null and keyword != ''">
+            AND (
+            id = #{keyword} OR
+            (name LIKE CONCAT('%', #{keyword}, '%'))
+            )
+
+        </if>
+        ORDER BY pos DESC
+    </select>
+    <select id="getPos" resultType="java.lang.Long">
+        SELECT pos
+        FROM environment
+        WHERE project_id = #{projectId}
+        ORDER BY pos DESC
+        LIMIT 1;
+    </select>
+
+    <select id="getPrePos" resultType="java.lang.Long">
+        select `pos` from environment where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &lt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+
+    <select id="getLastPos" resultType="java.lang.Long">
+        select `pos` from environment where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &gt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+    <select id="getGroupPos" resultType="java.lang.Long">
+        SELECT pos
+        FROM environment_group
+        WHERE project_id = #{projectId}
+        ORDER BY pos DESC
+        LIMIT 1;
+    </select>
+    <select id="getGroupPrePos" resultType="java.lang.Long">
+        select `pos` from environment_group where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &gt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+    <select id="getGroupLastPos" resultType="java.lang.Long">
+        select `pos` from environment_group where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &gt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+    <select id="selectDragInfoById" resultType="io.metersphere.project.dto.DropNode">
+        SELECT id, pos
+        FROM environment
+        WHERE id = #{0}
+    </select>
+    <select id="selectNodeByPosOperator"
+            parameterType="io.metersphere.project.dto.NodeSortQueryParam"
+            resultType="io.metersphere.project.dto.DropNode">
+        SELECT id, pos
+        FROM environment
+        WHERE project_id = #{parentId}
+        <if test="operator == 'moreThan'">
+            AND pos &gt; #{pos}
+        </if>
+        <if test="operator == 'lessThan'">
+            AND pos &lt; #{pos}
+        </if>
+        ORDER BY pos
+        <if test="operator == 'lessThan' or operator == 'latest'">
+            DESC
+        </if>
+        LIMIT 1
+    </select>
+    <select id="selectIdByProjectIdOrderByPos" resultType="java.lang.String">
+        SELECT id
+        FROM environment
+        WHERE project_id = #{projectId}
+        ORDER BY pos
+    </select>
+    <select id="selectGroupIdByProjectIdOrderByPos" resultType="java.lang.String">
+        SELECT id
+        FROM environment_group
+        WHERE project_id = #{projectId}
+        ORDER BY pos
+    </select>
+    <select id="selectGroupDragInfoById" resultType="io.metersphere.project.dto.DropNode">
+        SELECT id, pos
+        FROM environment_group
+        WHERE id = #{0}
+    </select>
+    <select id="selectGroupNodeByPosOperator"
+            parameterType="io.metersphere.project.dto.NodeSortQueryParam"
+            resultType="io.metersphere.project.dto.DropNode">
+        SELECT id, pos
+        FROM environment_group
+        WHERE project_id = #{parentId}
+        <if test="operator == 'moreThan'">
+            AND pos &gt; #{pos}
+        </if>
+        <if test="operator == 'lessThan'">
+            AND pos &lt; #{pos}
+        </if>
+        ORDER BY pos
+        <if test="operator == 'lessThan' or operator == 'latest'">
+            DESC
+        </if>
+        LIMIT 1
+    </select>
+</mapper>

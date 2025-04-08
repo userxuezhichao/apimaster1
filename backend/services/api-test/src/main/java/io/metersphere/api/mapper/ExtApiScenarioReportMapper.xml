@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.api.mapper.ExtApiScenarioReportMapper">
+    <update id="updateReportStatus">
+        update api_scenario_report
+        set status = '-',
+            exec_status = 'STOPPED',
+            update_time = #{time},
+            update_user = #{userId}
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+    <update id="updateApiScenario">
+        update api_scenario
+        set last_report_status = '-'
+        where id in (
+        select api_scenario_id from api_scenario_record where api_scenario_report_id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+            )
+    </update>
+
+    <select id="list" resultType="io.metersphere.api.domain.ApiScenarioReport">
+        select
+        asr.*
+        from api_scenario_report asr where asr.deleted = false
+                          and asr.test_plan_scenario_id = 'NONE'
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            asr.name like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <if test="request.projectId != null and request.projectId != ''">
+            and asr.project_id = #{request.projectId}
+        </if>
+        and status in ('SUCCESS', 'ERROR', 'FAKE_ERROR')
+        <include refid="filters">
+            <property name="filter" value="request.filter"/>
+        </include>
+        <include refid="combine">
+            <property name="combineSearch" value="request.combineSearch"/>
+        </include>
+    </select>
+    <select id="getIds" resultType="java.lang.String">
+        select
+        asr.id
+        from api_scenario_report asr where asr.deleted = false
+                          and asr.test_plan_scenario_id = 'NONE'
+        <if test="request.condition.keyword != null">
+            and (
+            asr.name like concat('%', #{request.condition.keyword},'%')
+            )
+        </if>
+        <if test="request.projectId != null and request.projectId != ''">
+            and asr.project_id = #{request.projectId}
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+        <include refid="combine">
+            <property name="combineSearch" value="request.condition.combineSearch"/>
+        </include>
+    </select>
+    <select id="selectApiReportByIds" resultType="io.metersphere.api.domain.ApiScenarioReport">
+        select
+        api_scenario_report.id,
+        api_scenario_report.name
+        from api_scenario_report where
+                         api_scenario_report.test_plan_scenario_id = 'NONE'
+        and api_scenario_report.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="selectStepByReportId" resultType="io.metersphere.api.dto.scenario.ApiScenarioReportStepDTO">
+        select api_scenario_report_step.step_id,
+               api_scenario_report_step.report_id,
+               api_scenario_report_step.`name`,
+               api_scenario_report_step.sort,
+               api_scenario_report_step.step_type,
+               api_scenario_report_step.parent_id
+        from api_scenario_report_step
+
+        where api_scenario_report_step.report_id = #{reportId}
+    </select>
+
+    <select id="selectApiScenarioReportByProjectId" resultType="java.lang.String">
+        select
+        api_scenario_report.id
+        from api_scenario_report where api_scenario_report.project_id = #{projectId} limit 500
+    </select>
+    <select id="countScenarioReportByTime" resultType="java.lang.Integer">
+        select
+        count(api_scenario_report.id)
+        from api_scenario_report inner join api_scenario_report_step on
+        api_scenario_report.id = api_scenario_report_step.report_id
+        where api_scenario_report.test_plan_scenario_id = 'NONE'
+          and api_scenario_report.start_time &lt;= #{time}
+          and api_scenario_report.project_id = #{projectId}
+    </select>
+    <select id="selectApiReportByProjectIdAndTime" resultType="java.lang.String">
+        select
+            api_scenario_report.id
+        from api_scenario_report inner join api_scenario_report_step on
+            api_scenario_report.id = api_scenario_report_step.report_id
+        where api_scenario_report.test_plan_scenario_id = 'NONE'
+          and api_scenario_report.start_time &lt;= #{time}
+          and api_scenario_report.project_id = #{projectId} limit 500
+    </select>
+    <select id="getReports" resultType="io.metersphere.api.dto.report.ReportDTO">
+
+        select distinct asr.*, project.organization_id,
+        asr.test_plan_scenario_id as testPlanId,
+        if (asr.test_plan_scenario_id = 'NONE'  and asr.integrated =0 , a.api_scenario_id , asr.test_plan_scenario_id) as resourceId
+         from api_scenario_report asr
+        left join api_scenario_record a on asr.id = a.api_scenario_report_id
+        left JOIN api_scenario s on a.api_scenario_id = s.id
+                      left join project on asr.project_id = project.id
+                      where
+        asr.deleted = false
+        and asr.plan = 0
+        and asr.start_time BETWEEN #{startTime} AND #{endTime}
+        and asr.exec_status in ('PENDING', 'RUNNING', 'RERUNNING')
+        <if test="ids != null and ids.size() > 0">
+            and asr.id in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectIds != null and projectIds.size() > 0">
+            and asr.project_id in
+            <foreach collection="projectIds" item="projectId" open="(" separator="," close=")">
+                #{projectId}
+            </foreach>
+        </if>
+        <if test="request.condition.keyword != null">
+            and (
+            if(asr.integrated, asr.id, s.num) like concat('%', #{request.condition.keyword},'%')
+            or if(asr.integrated, asr.name,s.name) like concat('%', #{request.condition.keyword},'%')
+
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+
+    </select>
+
+    <select id="taskCenterlist" resultType="io.metersphere.system.dto.taskcenter.TaskCenterDTO">
+        select
+        distinct asr.id,
+        asr.project_id,
+        asr.integrated,
+        asr.status,
+        asr.exec_status,
+        asr.start_time as operationTime,
+        asr.create_user as operationName,
+        asr.trigger_mode,
+        asr.script_identifier,
+        asr.start_time,
+        asr.plan,
+        project.organization_id,
+
+        if(asr.integrated, asr.id, s.num) AS resourceNum,
+        if(asr.integrated, asr.name,s.name) AS resourceName,
+        if (asr.integrated,asr.id,s.id ) AS resourceId,
+
+        t.name as poolName
+        from api_scenario_report asr
+        left join api_scenario_record a on asr.id = a.api_scenario_report_id
+        INNER JOIN api_scenario s on a.api_scenario_id = s.id
+        left JOIN test_resource_pool t on asr.pool_id = t.id
+        left join project on asr.project_id = project.id
+        where asr.start_time BETWEEN #{startTime} AND #{endTime}
+        and asr.plan = 0
+        <if test="projectIds != null and projectIds.size() > 0">
+            and
+            asr.project_id IN
+            <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+                #{projectId}
+            </foreach>
+        </if>
+
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+            if(asr.integrated, asr.id, s.num) like concat('%', #{request.keyword},'%')
+            or if(asr.integrated, asr.name,s.name) like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.filter"/>
+        </include>
+    </select>
+    <select id="selectByIds" resultType="io.metersphere.api.dto.report.ReportDTO">
+        select
+        api_scenario_report.id,
+        api_scenario_report.name,
+        api_scenario_report.project_id
+        from api_scenario_report where api_scenario_report.deleted = false
+                          and api_scenario_report.test_plan_scenario_id = 'NONE'
+        and api_scenario_report.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="getOrgListByProjectIds" resultType="io.metersphere.api.dto.report.ReportDTO">
+        select
+        p.id as projectId,
+        o.id as organizationId
+        from project p
+        inner join organization o on p.organization_id = o.id
+        <if test="ids != null and ids.size() > 0">
+            where p.id in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+    <select id="getScenarioBlob" resultType="io.metersphere.api.domain.ApiScenarioBlob">
+        select
+        api_scenario_blob.*
+        from api_scenario_blob inner join api_scenario_record on api_scenario_blob.id = api_scenario_record.api_scenario_id
+        where api_scenario_record.api_scenario_report_id = #{id}
+
+    </select>
+    <select id="selectStepDetailByReportId"
+            resultType="io.metersphere.api.dto.scenario.ApiScenarioReportStepDTO">
+        select api_scenario_report_detail.step_id,
+               api_scenario_report_detail.report_id,
+               api_scenario_report_detail.status,
+               api_scenario_report_detail.fake_code,
+               api_scenario_report_detail.request_name,
+               api_scenario_report_detail.request_time,
+               api_scenario_report_detail.code,
+               api_scenario_report_detail.response_size,
+               api_scenario_report_detail.script_identifier,
+               api_scenario_report_detail.sort as loopIndex
+        from api_scenario_report_detail
+        where api_scenario_report_detail.report_id = #{id}
+    </select>
+    <select id="getNoticeList" resultType="io.metersphere.system.dto.sdk.ApiReportMessageDTO">
+        select id ,name from api_scenario_report
+        <if test="ids != null and ids.size() > 0">
+            where id in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+    <select id="getHistoryDeleted" resultType="io.metersphere.api.dto.definition.ExecuteReportDTO">
+        select distinct asr.* from
+                     api_scenario_report asr inner join api_scenario_report_step ars on asr.id = ars.report_id
+        <if test="ids != null and ids.size() > 0">
+            where asr.id in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getTestPlanNum" resultType="io.metersphere.api.dto.definition.ExecuteReportDTO">
+        select asr.id, test_plan.num as testPlanNum
+        from api_scenario_report asr
+        inner join test_plan_api_scenario tpas on asr.test_plan_scenario_id = tpas.id
+        inner join test_plan on tpas.test_plan_id = test_plan.id
+        <if test="ids != null and ids.size() > 0">
+            where asr.id in
+            <foreach collection="ids" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+    <select id="selectExecResultByScenarioIds" resultType="io.metersphere.api.dto.ApiExecResultDTO">
+        select record.api_scenario_id AS resourceId,report.status AS execResult
+        from api_scenario_record record
+        inner join api_scenario_report report on record.api_scenario_report_id = report.id
+        where record.api_scenario_id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='integrated'">
+                            and asr.integrated in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                <choose>
+                                    <when test="value == 'true'">1</when>
+                                    <when test="value == 'false'">0</when>
+                                    <otherwise>0</otherwise>
+                                </choose>
+                            </foreach>
+                        </when>
+                        <when test="key=='status'">
+                            and asr.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='execStatus'">
+                            and asr.exec_status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='triggerMode'">
+                            and asr.trigger_mode in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='createUser'">
+                            and asr.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='updateUser'">
+                            and asr.update_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='projectIds'">
+                            and asr.project_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                        <when test="key=='organizationIds'">
+                            and project.organization_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="asr.create_user"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="asr"/>
+                        </include>
+                        <!-- 报告类型 -->
+                        <if test="condition.name == 'integrated'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="asr.integrated"/>
+                            </include>
+                        </if>
+                        <!-- 执行结果 -->
+                        <if test="condition.name == 'status'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="asr.status"/>
+                            </include>
+                        </if>
+                        <!-- 触发方式 -->
+                        <if test="condition.name == 'triggerMode'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="asr.trigger_mode"/>
+                            </include>
+                        </if>
+                        <!-- 创建时间 -->
+                        <if test="condition.name == 'startTime'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="asr.start_time"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+
+</mapper>

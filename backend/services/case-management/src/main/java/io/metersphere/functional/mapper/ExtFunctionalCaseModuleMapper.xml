@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.functional.mapper.ExtFunctionalCaseModuleMapper">
+    <select id="selectBaseByProjectId" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
+        SELECT id, name, parent_id AS parentId, 'module' AS type
+        FROM functional_case_module
+        WHERE project_id = #{projectId}
+        ORDER BY pos
+    </select>
+    <select id="selectFunRootIdByReviewId" resultType="io.metersphere.functional.dto.ProjectOptionDTO">
+        SELECT fc.module_id as id, fc.project_id as name, p.name as projectName
+        FROM functional_case fc
+            LEFT JOIN case_review_functional_case crfc ON crfc.case_id = fc.id
+            LEFT JOIN project p ON fc.project_id = p.id
+        WHERE crfc.review_id = #{reviewId}
+          AND fc.deleted = false AND fc.module_id = 'root'
+        ORDER BY fc.pos
+    </select>
+    <select id="selectBaseByProjectIdAndReviewId" resultType="io.metersphere.functional.dto.FunctionalCaseModuleDTO">
+        SELECT fcm.id, fcm.project_id, p.name as projectName
+        FROM functional_case_module fcm
+        LEFT JOIN project p ON fcm.project_id = p.id
+        WHERE fcm.id IN
+        (SELECT fc.module_id FROM functional_case fc LEFT JOIN case_review_functional_case crfc ON crfc.case_id = fc.id WHERE crfc.review_id = #{reviewId} AND fc.deleted = false)
+        ORDER BY pos
+    </select>
+    <select id="selectBaseByIds" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
+        SELECT id, name, parent_id AS parentId, 'module' AS type
+        FROM functional_case_module
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY pos
+    </select>
+    <select id="selectModuleByParentIdAndPosOperator"
+            parameterType="io.metersphere.project.dto.NodeSortQueryParam"
+            resultType="io.metersphere.system.dto.sdk.BaseModule">
+        SELECT id, name, pos, project_Id, parent_id
+        FROM functional_case_module
+        WHERE parent_id = #{parentId}
+        <if test="operator == 'moreThan'">
+            AND pos &gt; #{pos}
+        </if>
+        <if test="operator == 'lessThan'">
+            AND pos &lt; #{pos}
+        </if>
+        ORDER BY pos
+        <if test="operator == 'lessThan' or operator == 'latest'">
+            DESC
+        </if>
+        LIMIT 1
+    </select>
+    <select id="selectChildrenIdsByParentIds" resultType="java.lang.String">
+        SELECT id FROM functional_case_module WHERE parent_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+       </foreach>
+    </select>
+    <select id="getMaxPosByParentId" resultType="java.lang.Long">
+        SELECT max(pos)
+        FROM functional_case_module
+        WHERE  parent_id = #{0}
+    </select>
+    <select id="selectChildrenIdsSortByPos" resultType="java.lang.String">
+        SELECT id FROM functional_case_module WHERE parent_id  = #{0}
+        ORDER BY pos ASC
+    </select>
+
+    <select id="selectBaseModuleById" resultType="io.metersphere.system.dto.sdk.BaseModule">
+        SELECT id, name, pos, project_Id, parent_id
+        FROM functional_case_module
+        WHERE id = #{0}
+    </select>
+
+    <select id="selectIdAndParentIdByProjectId" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
+        SELECT id, parent_id AS parentId
+        FROM functional_case_module
+        WHERE project_id = #{0}
+    </select>
+
+    <select id="selectApiCaseModuleByRequest" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
+        SELECT m.id,
+        m.parent_id AS parentId,
+        m.name,
+        m.pos,
+        m.project_id,
+        'MODULE' AS type
+        FROM api_definition_module m
+        <include refid="module_request"/>
+        ORDER BY pos
+    </select>
+
+    <select id="selectApiScenarioModuleByRequest" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
+        SELECT m.id,
+        m.parent_id AS parentId,
+        m.name,
+        m.pos,
+        m.project_id,
+        'MODULE' AS type
+        FROM api_scenario_module m
+        <include refid="module_request"/>
+        ORDER BY pos
+    </select>
+
+    <select id="selectIdByProjectIdAndReviewId" resultType="java.lang.String">
+        SELECT fcm.id, fcm.project_id
+        FROM functional_case_module fcm
+        WHERE fcm.id IN
+        (SELECT fc.module_id FROM functional_case fc LEFT JOIN case_review_functional_case crfc ON crfc.case_id = fc.id WHERE crfc.review_id = #{reviewId} AND fc.deleted = false)
+    </select>
+
+    <sql id="module_request">
+        <where>
+            <if test="request.projectId != null and request.projectId != ''">
+                AND m.project_id = #{request.projectId}
+            </if>
+            <if test="request.keyword != null and request.keyword != ''">
+                AND m.name like CONCAT('%', #{request.keyword},'%')
+            </if>
+            <if test="request.moduleIds != null and request.moduleIds.size() != 0">
+                AND m.module_id IN
+                <foreach collection="request.moduleIds" item="item" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+
+        </where>
+    </sql>
+
+    <update id="batchUpdateStringColumn">
+        update functional_case_module
+        set  ${column} = #{value}
+        where id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="getNameInfoByIds" resultType="io.metersphere.functional.domain.FunctionalCaseModule">
+        SELECT id, name
+        FROM functional_case_module
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

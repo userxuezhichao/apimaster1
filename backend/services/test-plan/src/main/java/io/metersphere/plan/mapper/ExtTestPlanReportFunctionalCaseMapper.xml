@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.plan.mapper.ExtTestPlanReportFunctionalCaseMapper">
+
+    <select id="getPlanExecuteCases" resultType="io.metersphere.plan.domain.TestPlanReportFunctionCase">
+        select tpfc.id as testPlanFunctionCaseId, fc.id as functionCaseId, fc.num as functionCaseNum, fc.name as functionCaseName, tpfc.test_plan_collection_id testPlanCollectionId,
+               if(fc.module_id = 'root','未规划用例', fc.module_id) as functionCaseModule, tpfc.execute_user as functionCaseExecuteUser,
+               ifnull(tpfc.last_exec_result, 'PENDING') as functionCaseExecuteResult, tpfc.pos as pos
+        from test_plan_functional_case tpfc join functional_case fc on tpfc.functional_case_id = fc.id
+        left join functional_case_module fcm on fcm.id = fc.module_id
+        where tpfc.test_plan_id = #{id} and fc.deleted = false
+        and tpfc.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        group by tpfc.id
+    </select>
+
+    <select id="getPlanExecuteCaseModules" resultType="io.metersphere.plan.dto.TestPlanBaseModule">
+        select fcm.id, fcm.name from functional_case_module fcm
+        where fcm.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="getCasePriorityByIds" resultType="io.metersphere.plugin.platform.dto.SelectOption">
+        select distinct
+        fc.id as value,
+        fccf.`value` as text
+        from functional_case fc
+        left join functional_case_custom_field fccf ON fc.id = fccf.case_id
+        left join custom_field cf on cf.id = fccf.field_id
+        left join custom_field_option cfo on cfo.field_id = cf.id
+        where cf.`name` = 'functional_priority' and fc.id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="countExecuteSuccessCase" resultType="java.lang.Long">
+        select count(*) from test_plan_report_function_case tprfc
+        where tprfc.test_plan_report_id = #{id} and tprfc.function_case_execute_result = 'SUCCESS'
+    </select>
+
+    <select id="countExecuteResult" resultType="io.metersphere.plan.dto.CaseStatusCountMap">
+        select ifnull(tprfc.function_case_execute_result, 'PENDING') as status, count(id) as count from test_plan_report_function_case tprfc
+        where tprfc.test_plan_report_id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        group by tprfc.function_case_execute_result
+    </select>
+
+    <select id="list" resultType="io.metersphere.plan.dto.ReportDetailCasePageDTO">
+        <!-- ID、用例名称、所属模块、用例等级、执行人、执行结果、缺陷数、报告ID -->
+        select tprfc.function_case_id as id, tprfc.function_case_num as num, tprfc.function_case_name as name, tprfc.test_plan_collection_id collectionId, tpc.name collectionName,
+            tprfc.function_case_module as moduleName, tprfc.function_case_priority as priority, tprfc.test_plan_name as planName,
+            ifnull(tprfc.function_case_execute_result, 'PENDING') as executeResult, tprfc.function_case_execute_user as executeUser,
+            ifnull(tprfc.function_case_bug_count, 0) as bugCount, tprfc.function_case_execute_report_id reportId, fc.project_id projectId
+        from test_plan_report_function_case tprfc
+            left join functional_case fc on fc.id = tprfc.function_case_id
+            left join test_plan_collection tpc on tpc.id = tprfc.test_plan_collection_id
+        where tprfc.test_plan_report_id in
+        <foreach collection="request.detailReportIds" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (tprfc.function_case_num like concat('%', #{request.keyword}, '%')
+            or tprfc.function_case_name like concat('%', #{request.keyword}, '%')
+            or tprfc.function_case_module like concat('%', #{request.keyword}, '%'))
+        </if>
+        <if test="request.collectionId != null and request.collectionId != ''">
+            and tprfc.test_plan_collection_id = #{request.collectionId}
+        </if>
+        <include refid="filter"/>
+        <choose>
+            <when test="sort != null and sort != ''">
+                order by ${sort}
+            </when>
+            <otherwise>
+                order by tprfc.pos desc
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="listCollection" resultType="io.metersphere.plan.dto.response.TestPlanReportDetailCollectionResponse">
+        select tpc.id as id, tpc.name as collectionName, tp.name as planName, tpc.pos as pos, count(tprfc.id) as count
+        from test_plan_report_function_case tprfc
+            right join test_plan_collection tpc on tprfc.test_plan_collection_id = tpc.id and tpc.type = 'FUNCTIONAL'
+            join test_plan tp on tpc.test_plan_id = tp.id
+        where tprfc.test_plan_report_id in
+        <foreach collection="request.detailReportIds" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (tprfc.function_case_num like concat('%', #{request.keyword}, '%')
+            or tprfc.function_case_name like concat('%', #{request.keyword}, '%')
+            or tprfc.function_case_module like concat('%', #{request.keyword}, '%'))
+        </if>
+        <include refid="filter"/>
+        group by tprfc.test_plan_collection_id
+    </select>
+
+    <select id="getPlanExecuteCasesId" resultType="java.lang.String">
+        select tpfc.id
+        from test_plan_functional_case tpfc
+                 inner join functional_case fc on tpfc.functional_case_id = fc.id
+        where tpfc.test_plan_id = #{id}
+          and fc.deleted = false
+        order by tpfc.pos
+    </select>
+
+    <sql id="filter">
+        <if test="request.filter != null and request.filter.size() > 0">
+            <foreach collection="request.filter.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <!-- 执行结果 -->
+                        <when test="key == 'executeResult'">
+                            and tprfc.function_case_execute_result in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 等级 -->
+                        <when test="key == 'priority'">
+                            and tprfc.function_case_priority in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 计划名称 -->
+                        <when test="key == 'planName'">
+                            and tp.name in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+</mapper>

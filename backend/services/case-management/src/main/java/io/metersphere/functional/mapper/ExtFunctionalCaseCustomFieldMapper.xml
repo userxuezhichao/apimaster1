@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.functional.mapper.ExtFunctionalCaseCustomFieldMapper">
+
+    <select id="getCustomFieldByCaseIds" resultType="io.metersphere.functional.domain.FunctionalCaseCustomField">
+        select case_id, field_id, `value` from functional_case_custom_field where case_id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="batchUpdate">
+        update functional_case_custom_field
+        set  `value` = #{functionalCaseCustomField.value}
+        where field_id = #{functionalCaseCustomField.fieldId}
+        and case_id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="getCustomFieldsByCaseIds" resultType="io.metersphere.functional.dto.FunctionalCaseCustomFieldDTO">
+        SELECT
+        fccf.case_id caseId,
+        fccf.field_id fieldId,
+        fccf.`value` defaultValue,
+        cf.NAME fieldName,
+        cf.internal internal,
+        cf.type type,
+        cf.NAME internalFieldKey
+        FROM
+        functional_case_custom_field fccf
+        INNER JOIN custom_field cf ON fccf.field_id = cf.id
+        where case_id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <delete id="batchDelete">
+        delete from functional_case_custom_field
+        where field_id = #{functionalCaseCustomField.fieldId}
+        and case_id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

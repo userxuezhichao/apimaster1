@@ -1,0 +1,36 @@
+[
+  {
+    "id": "BUG",
+    "name": "permission.bug.name",
+    "type": "PROJECT",
+    "children": [
+      {
+        "id": "BUG",
+        "name": "permission.bug",
+        "permissions": [
+          {
+            "id": "PROJECT_BUG:READ"
+          },
+          {
+            "id": "PROJECT_BUG:READ+ADD"
+          },
+          {
+            "id": "PROJECT_BUG:READ+UPDATE"
+          },
+          {
+            "id": "PROJECT_BUG:READ+DELETE",
+            "name": "permission.api_definition.delete_and_recover"
+          },
+          {
+            "id": "PROJECT_BUG:READ+EXPORT"
+          },
+          {
+            "id": "PROJECT_BUG:READ+COMMENT",
+            "name": "permission.functional_case.comment"
+          }
+        ]
+      }
+    ],
+    "order": 8
+  }
+]

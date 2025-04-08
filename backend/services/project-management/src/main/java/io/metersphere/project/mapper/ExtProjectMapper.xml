@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.project.mapper.ExtProjectMapper">
+
+
+    <select id="getUserProject" resultType="io.metersphere.project.domain.Project">
+        SELECT DISTINCT p.*
+        FROM user_role u
+        JOIN user_role_relation urr ON u.id = urr.role_id
+        JOIN project p ON p.id = urr.source_id
+        JOIN user on urr.user_id = user.id
+        where urr.user_id = #{userId} and  u.type = 'PROJECT'
+          AND p.organization_id = #{organizationId} and p.enable = 1 and user.deleted = 0
+        order by
+            CONVERT( p.name  USING GBK) ASC
+    </select>
+
+
+    <select id="getModuleSetting" resultType="java.lang.String">
+        select module_setting from project where id = #{projectId}
+    </select>
+    <select id="getProject" resultType="io.metersphere.project.domain.Project">
+        SELECT DISTINCT p.*
+        FROM user_role u
+                 JOIN user_role_relation urr ON u.id = urr.role_id
+                 JOIN project p ON p.id = urr.source_id
+                 JOIN user on urr.user_id = user.id
+        where urr.user_id = #{userId}
+          and u.type = 'PROJECT'
+          and p.enable = 1
+          and user.deleted = 0
+    </select>
+    <select id="getAllProjectByOrgId" resultType="io.metersphere.project.domain.Project">
+        select id, name, organization_id
+        from project
+        where
+            organization_id = #{organizationId}
+
+        order by create_time desc
+        limit 1000
+
+    </select>
+    <select id="getProjectByOrgId" resultType="io.metersphere.project.domain.Project">
+        SELECT DISTINCT p.id, p.name, p.organization_id
+        FROM user_role u
+                 JOIN user_role_relation urr ON u.id = urr.role_id
+                 JOIN project p ON p.id = urr.source_id
+                 JOIN user on urr.user_id = user.id
+        where urr.user_id = #{userId}
+          and u.type = 'PROJECT'
+          and p.enable = 1
+          and user.deleted = 0
+          and p.organization_id = #{organizationId}
+        order by p.create_time desc
+        limit 1000
+    </select>
+    <select id="resourcePoolIsExist" resultType="int">
+        select count(t.id) from test_resource_pool t left join project_test_resource_pool p on
+            t.id = p.test_resource_pool_id
+                 where p.project_id = #{projectId} and t.id = #{poolId}
+         and t.enable = 1 and t.deleted = 0
+    </select>
+    <select id="resourcePoolIsExistByOrg" resultType="java.lang.Integer">
+        select count(t.id) from test_resource_pool_organization o
+            left join test_resource_pool t on t.id = o.test_resource_pool_id
+            left join project_test_resource_pool p on t.id = p.test_resource_pool_id
+                 where p.project_id = #{projectId} and t.id = #{poolId}
+          and t.enable = 1 and t.deleted = 0
+    </select>
+    <select id="getResourcePool" resultType="io.metersphere.project.domain.ProjectTestResourcePool">
+        select p.*
+        from project_test_resource_pool p left join test_resource_pool t on
+            t.id = p.test_resource_pool_id
+        where p.project_id = #{projectId}
+          and t.enable = 1
+          and t.deleted = 0
+    </select>
+    <select id="getAllProject" resultType="io.metersphere.project.domain.Project">
+        select *
+        from project
+        where enable = 1 and
+                organization_id = #{organizationId}
+        order by
+            CONVERT( name  USING GBK) ASC
+    </select>
+
+    <select id="getResourcePoolOption" resultType="io.metersphere.system.domain.TestResourcePool">
+        select t.*
+        from project_test_resource_pool p left join test_resource_pool t on
+            t.id = p.test_resource_pool_id
+        where p.project_id = #{projectId}
+          and t.enable = 1
+          and t.deleted = 0
+    </select>
+
+    <select id="getAllProjectWidthModule" resultType="io.metersphere.project.domain.Project">
+        select *
+        from project
+        where enable = 1 and
+            organization_id = #{organizationId}
+          AND module_setting like concat('%', #{module},'%')
+        order by
+            CONVERT( name  USING GBK) ASC
+    </select>
+
+    <select id="getUserProjectWidthModule" resultType="io.metersphere.project.domain.Project">
+        SELECT DISTINCT p.*
+        FROM user_role u
+                 JOIN user_role_relation urr ON u.id = urr.role_id
+                 JOIN project p ON p.id = urr.source_id
+                 JOIN user on urr.user_id = user.id
+        where urr.user_id = #{userId} and  u.type = 'PROJECT'
+          AND p.organization_id = #{organizationId} and p.enable = 1 and user.deleted = 0
+          AND p.module_setting like concat('%', #{module},'%')
+        order by
+            CONVERT( p.name  USING GBK) ASC
+    </select>
+
+    <select id="getProjectNameModule" resultType="io.metersphere.project.domain.Project">
+        select id, name, module_setting
+        from project
+        where enable = 1
+          and deleted = 0
+        <if test="organizationId != null and organizationId != ''">
+            and
+            organization_id = #{organizationId}
+        </if>
+        <if test="ids != null and ids.size() > 0">
+            and id in
+            <foreach collection="ids" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+</mapper>

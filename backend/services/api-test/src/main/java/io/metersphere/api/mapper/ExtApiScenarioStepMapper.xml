@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.api.mapper.ExtApiScenarioStepMapper">
+
+    <select id="getStepIdsByScenarioId" resultType="java.lang.String">
+        SELECT id FROM api_scenario_step WHERE scenario_id = #{scenarioId}
+    </select>
+    <select id="getStepDTOByScenarioIds" resultType="io.metersphere.api.dto.scenario.ApiScenarioStepDTO" flushCache="true">
+        select
+        <include refid="io.metersphere.api.mapper.ApiScenarioStepMapper.Base_Column_List"/>
+        from api_scenario_step where scenario_id in
+        <foreach collection="scenarioIds" item="scenarioId" open="(" separator="," close=")">
+            #{scenarioId}
+        </foreach>
+    </select>
+    <select id="getCsvStepByScenarioIds" resultType="io.metersphere.api.domain.ApiScenarioCsvStep">
+        select
+        <include refid="io.metersphere.api.mapper.ApiScenarioCsvStepMapper.Base_Column_List"/>
+        from api_scenario_csv_step where scenario_id in
+        <foreach collection="scenarioIds" item="scenarioId" open="(" separator="," close=")">
+            #{scenarioId}
+        </foreach>
+    </select>
+    <select id="getHasBlobRequestStepIds" resultType="java.lang.String">
+        select id
+        from api_scenario_step
+        where scenario_id = #{scenarioId}
+          and step_type in ('API', 'API_CASE', 'CUSTOM_REQUEST')
+          and ref_type in ('COPY', 'DIRECT')
+    </select>
+    <select id="selectResourceId" resultType="java.lang.String">
+        select DISTINCT step.resource_id
+        from api_scenario_step step
+                 INNER JOIN api_scenario scenario
+                            ON step.scenario_id = scenario.id
+        where step.step_type = #{stepType}
+          AND scenario.project_id = #{projectId}
+          AND scenario.deleted IS FALSE
+    </select>
+
+    <select id="selectApiResourceId" resultType="java.lang.String">
+        select DISTINCT step.resource_id
+        from api_scenario_step step
+        INNER JOIN api_scenario scenario
+        ON step.scenario_id = scenario.id
+        where step.step_type = #{stepType}
+        AND scenario.project_id = #{projectId}
+        AND scenario.deleted IS FALSE
+        <if test="protocols!= null and protocols.size > 0">
+            AND step.resource_id IN (
+            select distinct api.id FROM api_definition api
+            WHERE api.project_id = #{projectId} AND api.deleted IS FALSE and api.deleted IS FALSE AND api.protocol IN
+            <foreach collection="protocols" item="protocol" open="(" separator="," close=")">
+                #{protocol}
+            </foreach>
+            )
+        </if>
+    </select>
+
+    <select id="selectApiCaseResourceId" resultType="java.lang.String">
+        select DISTINCT step.resource_id
+        from api_scenario_step step
+        INNER JOIN api_scenario scenario
+        ON step.scenario_id = scenario.id
+        where step.step_type = #{stepType}
+        AND scenario.project_id = #{projectId}
+        AND scenario.deleted IS FALSE
+        <if test="protocols!= null and protocols.size > 0">
+            AND step.resource_id IN (
+            select distinct apiCase.id FROM api_definition api
+            INNER JOIN api_test_case apiCase ON api.id = apiCase.api_definition_id
+            WHERE api.project_id = #{projectId} AND api.deleted IS FALSE and api.deleted IS FALSE AND api.protocol IN
+            <foreach collection="protocols" item="protocol" open="(" separator="," close=")">
+                #{protocol}
+            </foreach>
+            )
+        </if>
+    </select>
+    <select id="selectCustomRequestConfigByProjectId" resultType="java.lang.String">
+        select step.id
+        from api_scenario_step step
+                 INNER JOIN api_scenario scenario
+                            ON step.scenario_id = scenario.id
+        where scenario.project_id = #{0}
+          AND scenario.deleted IS FALSE
+          AND step.step_type IN ('CUSTOM_REQUEST')
+          AND JSON_UNQUOTE(JSON_EXTRACT(LOWER(step.config), '$.protocol')) = 'http'
+    </select>
+</mapper>

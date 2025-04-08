@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.functional.mapper.ExtCaseReviewMapper">
+
+    <resultMap id="BaseResultMapDTO" type="io.metersphere.functional.dto.CaseReviewDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <select id="checkCaseByModuleIds" resultType="io.metersphere.functional.domain.CaseReview">
+        SELECT
+            id, name, module_id, create_user
+        FROM
+            case_review
+        WHERE
+            module_id IN
+        <foreach collection="moduleIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="getPos" resultType="java.lang.Long">
+        SELECT
+            pos
+        FROM
+            case_review
+        WHERE
+            project_id = #{projectId}
+        ORDER BY
+            pos DESC
+            LIMIT 1;
+    </select>
+
+    <select id="list" resultMap="BaseResultMapDTO">
+        SELECT
+        case_review.id, case_review.num, case_review.name,
+        case_review.module_id, case_review.project_id, case_review.status,
+        case_review.review_pass_rule, case_review.pos, case_review.start_time, case_review.end_time,
+        case_review.case_count, case_review.pass_rate, case_review.tags,
+        case_review.description, case_review.create_time, case_review.create_user,
+        case_review.update_time, case_review.update_user,
+        case_review_module.name as moduleName
+        FROM
+        case_review left join case_review_module on  case_review.module_id = case_review_module.id
+        where case_review.project_id = #{request.projectId}
+        <include refid="queryWhereCondition"/>
+    </select>
+
+    <select id="getIds" resultType="java.lang.String">
+        SELECT
+        id
+        FROM
+        case_review
+        where case_review.project_id = #{request.projectId}
+        <include refid="queryWhereConditionByBaseQueryRequest"/>
+    </select>
+
+    <sql id="queryWhereConditionByBaseQueryRequest">
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and case_review.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" separator="," open="(" close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+        <if test="request.condition.keyword != null">
+            and (
+            case_review.name like concat('%', #{request.condition.keyword},'%')
+            or case_review.num like concat('%', #{request.condition.keyword},'%')
+           )
+        </if>
+        <if test="request.createByMe != null">
+            and case_review.create_user = #{request.createByMe}
+        </if>
+        <if test="request.reviewByMe != null">
+            and case_review.id  in
+            (
+            select case_review_user.review_id from case_review_user where case_review_user.user_id = #{request.reviewByMe}
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+        <if test="request.condition.combineSearch != null">
+            <include refid="combine">
+                <property name="combineSearch" value="request.condition.combineSearch"/>
+            </include>
+        </if>
+    </sql>
+
+    <!--<sql id="baseQueryCombine">
+        <if test="request.condition.combine != null">
+            <include refid="combine">
+                <property name="condition" value="request.condition.combine"/>
+                <property name="name" value="request.condition.name"/>
+                <property name="ObjectTags" value="request.condition.combine.tags"/>
+                <property name="ObjectReviewers" value="request.condition.combine.reviewers"/>
+                <property name="ObjectModuleIds" value="request.condition.combine.moduleIds"/>
+            </include>
+        </if>
+        1=1
+    </sql>-->
+
+
+    <sql id="queryWhereCondition">
+        <if test="request.moduleIds != null and request.moduleIds.size() > 0">
+            and case_review.module_id in
+            <foreach collection="request.moduleIds" item="moduleId" separator="," open="(" close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+        <if test="request.keyword != null">
+            and (
+            case_review.name like concat('%', #{request.keyword},'%')
+            or case_review.num like concat('%', #{request.keyword},'%')
+            or case_review.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <if test="request.createByMe != null">
+            and case_review.create_user = #{request.createByMe}
+        </if>
+        <if test="request.reviewByMe != null">
+            and case_review.id  in
+            (
+            select case_review_user.review_id from case_review_user where case_review_user.user_id = #{request.reviewByMe}
+            )
+        </if>
+        <!-- 我的待办: "进行中"和"未开始"，评审人为我的所有评审; -->
+        <if test="request.myTodo">
+            and case_review.status in ('PREPARED', 'UNDERWAY')
+            and case_review.id in (
+                select review_id from case_review_user where user_id = #{request.myTodoUserId}
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.filter"/>
+        </include>
+        <include refid="combine">
+            <property name="combineSearch" value="request.combineSearch"/>
+        </include>
+    </sql>
+
+    <!--<sql id="queryCombine">
+        <include refid="combine">
+            <property name="condition" value="request.combine"/>
+            <property name="name" value="request.name"/>
+            <property name="ObjectTags" value="request.combine.tags"/>
+            <property name="ObjectReviewers" value="request.combine.reviewers"/>
+            <property name="ObjectModuleIds" value="request.combine.moduleIds"/>
+        </include>
+        1=1
+    </sql>-->
+
+    <sql id="queryType">
+        <choose>
+            <when test='${searchMode} == "AND"'>
+                AND
+            </when>
+            <when test='${searchMode} == "OR"'>
+                OR
+            </when>
+        </choose>
+    </sql>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <when test="key=='status'">
+                            and case_review.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='reviewPassRule'">
+                            and case_review.review_pass_rule in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='createUser'">
+                            and case_review.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <when test="key=='reviewers'">
+                            and case_review.id in (
+                            select case_review_user.review_id from case_review_user where case_review_user.user_id in
+                            <foreach collection="values" item="value" separator="," open="(" close=")">
+                                #{value}
+                            </foreach>
+                            )
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="case_review.create_user"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'follower'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="case_review.id"/>
+                                <property name="associationTable" value="case_review_follower"/>
+                                <property name="associationIdColumn" value="review_id"/>
+                                <property name="searchColumn" value="user_id"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="case_review"/>
+                        </include>
+                        <if test="condition.name == 'reviewers'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="case_review.id"/>
+                                <property name="associationTable" value="case_review_user"/>
+                                <property name="associationIdColumn" value="review_id"/>
+                                <property name="searchColumn" value="user_id"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'status'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="case_review.status"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'reviewPassRule'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="case_review.review_pass_rule"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'startTime'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="case_review.start_time"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'endTime'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="case_review.end_time"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'caseCount'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="case_review.case_count"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'passRate'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="case_review.pass_rate"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'description'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="case_review.description"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+
+    <sql id="condition">
+        <choose>
+
+            <when test='${object}.operator == "in"'>
+                in ( select review_id from case_review_user where case_review_user.user_id in
+                <foreach collection="${object}.value" item="v" separator="," open="(" close=")">
+                    #{v}
+                </foreach>
+                )
+            </when>
+            <when test='${object}.operator == "not in"'>
+                not in
+                ( select review_id from case_review_user where case_review_user.user_id in
+                <foreach collection="${object}.value" item="v" separator="," open="(" close=")">
+                    #{v}
+                </foreach>
+                )
+            </when>
+
+        </choose>
+    </sql>
+
+    <select id="getPrePos" resultType="java.lang.Long">
+        select `pos` from case_review where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &lt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+
+    <select id="getLastPos" resultType="java.lang.Long">
+        select `pos` from case_review where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &gt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+    <update id="batchMoveModule">
+        update case_review
+        set module_id = #{request.moveModuleId},
+        update_user = #{userId},
+        update_time = UNIX_TIMESTAMP()*1000
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="countModuleIdByKeywordAndFileType"  resultType="io.metersphere.project.dto.ModuleCountDTO">
+        SELECT module_id AS moduleId, count(id) AS dataCount
+        FROM case_review
+        WHERE project_id = #{request.projectId}
+        <include refid="queryWhereCondition"/>
+        GROUP BY moduleId
+    </select>
+
+    <select id="caseCount"
+            resultType="java.lang.Long">
+        SELECT count(id)
+        FROM case_review
+        WHERE  project_id = #{request.projectId}
+        <include refid="queryWhereCondition"/>
+    </select>
+
+    <select id="getReviewPassRule" resultType="java.lang.String">
+        select review_pass_rule from case_review where id = #{id}
+    </select>
+
+    <select id="projectReviewCount"
+            resultType="io.metersphere.project.dto.ProjectCountDTO">
+        SELECT case_review.project_id as projectId, count(case_review.id) as count
+        FROM case_review
+        WHERE case_review.project_id IN
+        <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+            #{projectId}
+        </foreach>
+        <if test="startTime != null and endTime != null">
+            AND case_review.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="userId != null and userId != ''">
+            AND case_review.create_user = #{userId}
+        </if>
+        group by case_review.project_id;
+    </select>
+
+    <select id="userCreateReviewCount"
+            resultType="io.metersphere.project.dto.ProjectUserCreateCount">
+        SELECT case_review.create_user as userId, count(case_review.id) as count
+        FROM case_review
+        WHERE case_review.project_id =  #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND case_review.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="userIds != null and userIds.size() > 0">
+            and case_review.create_user in
+            <foreach collection="userIds" item="userId" separator="," open="(" close=")">
+                #{userId}
+            </foreach>
+        </if>
+        group by case_review.create_user;
+    </select>
+    <select id="statusReviewCount" resultType="io.metersphere.project.dto.ProjectUserStatusCountDTO">
+        SELECT case_review.status as status, count(case_review.id) as count
+        FROM case_review
+        WHERE case_review.project_id =  #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND case_review.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        group by case_review.status;
+
+    </select>
+
+</mapper>

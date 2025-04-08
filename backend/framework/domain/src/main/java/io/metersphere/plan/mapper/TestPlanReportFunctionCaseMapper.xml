@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.plan.mapper.TestPlanReportFunctionCaseMapper">
+  <resultMap id="BaseResultMap" type="io.metersphere.plan.domain.TestPlanReportFunctionCase">
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="test_plan_report_id" jdbcType="VARCHAR" property="testPlanReportId" />
+    <result column="test_plan_function_case_id" jdbcType="VARCHAR" property="testPlanFunctionCaseId" />
+    <result column="function_case_id" jdbcType="VARCHAR" property="functionCaseId" />
+    <result column="function_case_num" jdbcType="BIGINT" property="functionCaseNum" />
+    <result column="function_case_name" jdbcType="VARCHAR" property="functionCaseName" />
+    <result column="function_case_module" jdbcType="VARCHAR" property="functionCaseModule" />
+    <result column="function_case_priority" jdbcType="VARCHAR" property="functionCasePriority" />
+    <result column="function_case_execute_user" jdbcType="VARCHAR" property="functionCaseExecuteUser" />
+    <result column="function_case_bug_count" jdbcType="BIGINT" property="functionCaseBugCount" />
+    <result column="function_case_execute_result" jdbcType="VARCHAR" property="functionCaseExecuteResult" />
+    <result column="test_plan_collection_id" jdbcType="VARCHAR" property="testPlanCollectionId" />
+    <result column="pos" jdbcType="BIGINT" property="pos" />
+    <result column="function_case_execute_report_id" jdbcType="VARCHAR" property="functionCaseExecuteReportId" />
+    <result column="test_plan_name" jdbcType="VARCHAR" property="testPlanName" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, test_plan_report_id, test_plan_function_case_id, function_case_id, function_case_num, 
+    function_case_name, function_case_module, function_case_priority, function_case_execute_user, 
+    function_case_bug_count, function_case_execute_result, test_plan_collection_id, pos, 
+    function_case_execute_report_id, test_plan_name
+  </sql>
+  <select id="selectByExample" parameterType="io.metersphere.plan.domain.TestPlanReportFunctionCaseExample" resultMap="BaseResultMap">
+    select
+    <if test="distinct">
+      distinct
+    </if>
+    <include refid="Base_Column_List" />
+    from test_plan_report_function_case
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from test_plan_report_function_case
+    where id = #{id,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
+    delete from test_plan_report_function_case
+    where id = #{id,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="io.metersphere.plan.domain.TestPlanReportFunctionCaseExample">
+    delete from test_plan_report_function_case
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="io.metersphere.plan.domain.TestPlanReportFunctionCase">
+    insert into test_plan_report_function_case (id, test_plan_report_id, test_plan_function_case_id, 
+      function_case_id, function_case_num, function_case_name, 
+      function_case_module, function_case_priority, 
+      function_case_execute_user, function_case_bug_count, 
+      function_case_execute_result, test_plan_collection_id, 
+      pos, function_case_execute_report_id, test_plan_name
+      )
+    values (#{id,jdbcType=VARCHAR}, #{testPlanReportId,jdbcType=VARCHAR}, #{testPlanFunctionCaseId,jdbcType=VARCHAR}, 
+      #{functionCaseId,jdbcType=VARCHAR}, #{functionCaseNum,jdbcType=BIGINT}, #{functionCaseName,jdbcType=VARCHAR}, 
+      #{functionCaseModule,jdbcType=VARCHAR}, #{functionCasePriority,jdbcType=VARCHAR}, 
+      #{functionCaseExecuteUser,jdbcType=VARCHAR}, #{functionCaseBugCount,jdbcType=BIGINT}, 
+      #{functionCaseExecuteResult,jdbcType=VARCHAR}, #{testPlanCollectionId,jdbcType=VARCHAR}, 
+      #{pos,jdbcType=BIGINT}, #{functionCaseExecuteReportId,jdbcType=VARCHAR}, #{testPlanName,jdbcType=VARCHAR}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="io.metersphere.plan.domain.TestPlanReportFunctionCase">
+    insert into test_plan_report_function_case
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="testPlanReportId != null">
+        test_plan_report_id,
+      </if>
+      <if test="testPlanFunctionCaseId != null">
+        test_plan_function_case_id,
+      </if>
+      <if test="functionCaseId != null">
+        function_case_id,
+      </if>
+      <if test="functionCaseNum != null">
+        function_case_num,
+      </if>
+      <if test="functionCaseName != null">
+        function_case_name,
+      </if>
+      <if test="functionCaseModule != null">
+        function_case_module,
+      </if>
+      <if test="functionCasePriority != null">
+        function_case_priority,
+      </if>
+      <if test="functionCaseExecuteUser != null">
+        function_case_execute_user,
+      </if>
+      <if test="functionCaseBugCount != null">
+        function_case_bug_count,
+      </if>
+      <if test="functionCaseExecuteResult != null">
+        function_case_execute_result,
+      </if>
+      <if test="testPlanCollectionId != null">
+        test_plan_collection_id,
+      </if>
+      <if test="pos != null">
+        pos,
+      </if>
+      <if test="functionCaseExecuteReportId != null">
+        function_case_execute_report_id,
+      </if>
+      <if test="testPlanName != null">
+        test_plan_name,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=VARCHAR},
+      </if>
+      <if test="testPlanReportId != null">
+        #{testPlanReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="testPlanFunctionCaseId != null">
+        #{testPlanFunctionCaseId,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseId != null">
+        #{functionCaseId,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseNum != null">
+        #{functionCaseNum,jdbcType=BIGINT},
+      </if>
+      <if test="functionCaseName != null">
+        #{functionCaseName,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseModule != null">
+        #{functionCaseModule,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCasePriority != null">
+        #{functionCasePriority,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseExecuteUser != null">
+        #{functionCaseExecuteUser,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseBugCount != null">
+        #{functionCaseBugCount,jdbcType=BIGINT},
+      </if>
+      <if test="functionCaseExecuteResult != null">
+        #{functionCaseExecuteResult,jdbcType=VARCHAR},
+      </if>
+      <if test="testPlanCollectionId != null">
+        #{testPlanCollectionId,jdbcType=VARCHAR},
+      </if>
+      <if test="pos != null">
+        #{pos,jdbcType=BIGINT},
+      </if>
+      <if test="functionCaseExecuteReportId != null">
+        #{functionCaseExecuteReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="testPlanName != null">
+        #{testPlanName,jdbcType=VARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="io.metersphere.plan.domain.TestPlanReportFunctionCaseExample" resultType="java.lang.Long">
+    select count(*) from test_plan_report_function_case
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update test_plan_report_function_case
+    <set>
+      <if test="record.id != null">
+        id = #{record.id,jdbcType=VARCHAR},
+      </if>
+      <if test="record.testPlanReportId != null">
+        test_plan_report_id = #{record.testPlanReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.testPlanFunctionCaseId != null">
+        test_plan_function_case_id = #{record.testPlanFunctionCaseId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.functionCaseId != null">
+        function_case_id = #{record.functionCaseId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.functionCaseNum != null">
+        function_case_num = #{record.functionCaseNum,jdbcType=BIGINT},
+      </if>
+      <if test="record.functionCaseName != null">
+        function_case_name = #{record.functionCaseName,jdbcType=VARCHAR},
+      </if>
+      <if test="record.functionCaseModule != null">
+        function_case_module = #{record.functionCaseModule,jdbcType=VARCHAR},
+      </if>
+      <if test="record.functionCasePriority != null">
+        function_case_priority = #{record.functionCasePriority,jdbcType=VARCHAR},
+      </if>
+      <if test="record.functionCaseExecuteUser != null">
+        function_case_execute_user = #{record.functionCaseExecuteUser,jdbcType=VARCHAR},
+      </if>
+      <if test="record.functionCaseBugCount != null">
+        function_case_bug_count = #{record.functionCaseBugCount,jdbcType=BIGINT},
+      </if>
+      <if test="record.functionCaseExecuteResult != null">
+        function_case_execute_result = #{record.functionCaseExecuteResult,jdbcType=VARCHAR},
+      </if>
+      <if test="record.testPlanCollectionId != null">
+        test_plan_collection_id = #{record.testPlanCollectionId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.pos != null">
+        pos = #{record.pos,jdbcType=BIGINT},
+      </if>
+      <if test="record.functionCaseExecuteReportId != null">
+        function_case_execute_report_id = #{record.functionCaseExecuteReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="record.testPlanName != null">
+        test_plan_name = #{record.testPlanName,jdbcType=VARCHAR},
+      </if>
+    </set>
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update test_plan_report_function_case
+    set id = #{record.id,jdbcType=VARCHAR},
+      test_plan_report_id = #{record.testPlanReportId,jdbcType=VARCHAR},
+      test_plan_function_case_id = #{record.testPlanFunctionCaseId,jdbcType=VARCHAR},
+      function_case_id = #{record.functionCaseId,jdbcType=VARCHAR},
+      function_case_num = #{record.functionCaseNum,jdbcType=BIGINT},
+      function_case_name = #{record.functionCaseName,jdbcType=VARCHAR},
+      function_case_module = #{record.functionCaseModule,jdbcType=VARCHAR},
+      function_case_priority = #{record.functionCasePriority,jdbcType=VARCHAR},
+      function_case_execute_user = #{record.functionCaseExecuteUser,jdbcType=VARCHAR},
+      function_case_bug_count = #{record.functionCaseBugCount,jdbcType=BIGINT},
+      function_case_execute_result = #{record.functionCaseExecuteResult,jdbcType=VARCHAR},
+      test_plan_collection_id = #{record.testPlanCollectionId,jdbcType=VARCHAR},
+      pos = #{record.pos,jdbcType=BIGINT},
+      function_case_execute_report_id = #{record.functionCaseExecuteReportId,jdbcType=VARCHAR},
+      test_plan_name = #{record.testPlanName,jdbcType=VARCHAR}
+    <if test="_parameter != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="io.metersphere.plan.domain.TestPlanReportFunctionCase">
+    update test_plan_report_function_case
+    <set>
+      <if test="testPlanReportId != null">
+        test_plan_report_id = #{testPlanReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="testPlanFunctionCaseId != null">
+        test_plan_function_case_id = #{testPlanFunctionCaseId,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseId != null">
+        function_case_id = #{functionCaseId,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseNum != null">
+        function_case_num = #{functionCaseNum,jdbcType=BIGINT},
+      </if>
+      <if test="functionCaseName != null">
+        function_case_name = #{functionCaseName,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseModule != null">
+        function_case_module = #{functionCaseModule,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCasePriority != null">
+        function_case_priority = #{functionCasePriority,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseExecuteUser != null">
+        function_case_execute_user = #{functionCaseExecuteUser,jdbcType=VARCHAR},
+      </if>
+      <if test="functionCaseBugCount != null">
+        function_case_bug_count = #{functionCaseBugCount,jdbcType=BIGINT},
+      </if>
+      <if test="functionCaseExecuteResult != null">
+        function_case_execute_result = #{functionCaseExecuteResult,jdbcType=VARCHAR},
+      </if>
+      <if test="testPlanCollectionId != null">
+        test_plan_collection_id = #{testPlanCollectionId,jdbcType=VARCHAR},
+      </if>
+      <if test="pos != null">
+        pos = #{pos,jdbcType=BIGINT},
+      </if>
+      <if test="functionCaseExecuteReportId != null">
+        function_case_execute_report_id = #{functionCaseExecuteReportId,jdbcType=VARCHAR},
+      </if>
+      <if test="testPlanName != null">
+        test_plan_name = #{testPlanName,jdbcType=VARCHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="io.metersphere.plan.domain.TestPlanReportFunctionCase">
+    update test_plan_report_function_case
+    set test_plan_report_id = #{testPlanReportId,jdbcType=VARCHAR},
+      test_plan_function_case_id = #{testPlanFunctionCaseId,jdbcType=VARCHAR},
+      function_case_id = #{functionCaseId,jdbcType=VARCHAR},
+      function_case_num = #{functionCaseNum,jdbcType=BIGINT},
+      function_case_name = #{functionCaseName,jdbcType=VARCHAR},
+      function_case_module = #{functionCaseModule,jdbcType=VARCHAR},
+      function_case_priority = #{functionCasePriority,jdbcType=VARCHAR},
+      function_case_execute_user = #{functionCaseExecuteUser,jdbcType=VARCHAR},
+      function_case_bug_count = #{functionCaseBugCount,jdbcType=BIGINT},
+      function_case_execute_result = #{functionCaseExecuteResult,jdbcType=VARCHAR},
+      test_plan_collection_id = #{testPlanCollectionId,jdbcType=VARCHAR},
+      pos = #{pos,jdbcType=BIGINT},
+      function_case_execute_report_id = #{functionCaseExecuteReportId,jdbcType=VARCHAR},
+      test_plan_name = #{testPlanName,jdbcType=VARCHAR}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <insert id="batchInsert" parameterType="map">
+    insert into test_plan_report_function_case
+    (id, test_plan_report_id, test_plan_function_case_id, function_case_id, function_case_num, 
+      function_case_name, function_case_module, function_case_priority, function_case_execute_user, 
+      function_case_bug_count, function_case_execute_result, test_plan_collection_id, 
+      pos, function_case_execute_report_id, test_plan_name)
+    values
+    <foreach collection="list" item="item" separator=",">
+      (#{item.id,jdbcType=VARCHAR}, #{item.testPlanReportId,jdbcType=VARCHAR}, #{item.testPlanFunctionCaseId,jdbcType=VARCHAR}, 
+        #{item.functionCaseId,jdbcType=VARCHAR}, #{item.functionCaseNum,jdbcType=BIGINT}, 
+        #{item.functionCaseName,jdbcType=VARCHAR}, #{item.functionCaseModule,jdbcType=VARCHAR}, 
+        #{item.functionCasePriority,jdbcType=VARCHAR}, #{item.functionCaseExecuteUser,jdbcType=VARCHAR}, 
+        #{item.functionCaseBugCount,jdbcType=BIGINT}, #{item.functionCaseExecuteResult,jdbcType=VARCHAR}, 
+        #{item.testPlanCollectionId,jdbcType=VARCHAR}, #{item.pos,jdbcType=BIGINT}, #{item.functionCaseExecuteReportId,jdbcType=VARCHAR}, 
+        #{item.testPlanName,jdbcType=VARCHAR})
+    </foreach>
+  </insert>
+  <insert id="batchInsertSelective" parameterType="map">
+    insert into test_plan_report_function_case (
+    <foreach collection="selective" item="column" separator=",">
+      ${column.escapedColumnName}
+    </foreach>
+    )
+    values
+    <foreach collection="list" item="item" separator=",">
+      (
+      <foreach collection="selective" item="column" separator=",">
+        <if test="'id'.toString() == column.value">
+          #{item.id,jdbcType=VARCHAR}
+        </if>
+        <if test="'test_plan_report_id'.toString() == column.value">
+          #{item.testPlanReportId,jdbcType=VARCHAR}
+        </if>
+        <if test="'test_plan_function_case_id'.toString() == column.value">
+          #{item.testPlanFunctionCaseId,jdbcType=VARCHAR}
+        </if>
+        <if test="'function_case_id'.toString() == column.value">
+          #{item.functionCaseId,jdbcType=VARCHAR}
+        </if>
+        <if test="'function_case_num'.toString() == column.value">
+          #{item.functionCaseNum,jdbcType=BIGINT}
+        </if>
+        <if test="'function_case_name'.toString() == column.value">
+          #{item.functionCaseName,jdbcType=VARCHAR}
+        </if>
+        <if test="'function_case_module'.toString() == column.value">
+          #{item.functionCaseModule,jdbcType=VARCHAR}
+        </if>
+        <if test="'function_case_priority'.toString() == column.value">
+          #{item.functionCasePriority,jdbcType=VARCHAR}
+        </if>
+        <if test="'function_case_execute_user'.toString() == column.value">
+          #{item.functionCaseExecuteUser,jdbcType=VARCHAR}
+        </if>
+        <if test="'function_case_bug_count'.toString() == column.value">
+          #{item.functionCaseBugCount,jdbcType=BIGINT}
+        </if>
+        <if test="'function_case_execute_result'.toString() == column.value">
+          #{item.functionCaseExecuteResult,jdbcType=VARCHAR}
+        </if>
+        <if test="'test_plan_collection_id'.toString() == column.value">
+          #{item.testPlanCollectionId,jdbcType=VARCHAR}
+        </if>
+        <if test="'pos'.toString() == column.value">
+          #{item.pos,jdbcType=BIGINT}
+        </if>
+        <if test="'function_case_execute_report_id'.toString() == column.value">
+          #{item.functionCaseExecuteReportId,jdbcType=VARCHAR}
+        </if>
+        <if test="'test_plan_name'.toString() == column.value">
+          #{item.testPlanName,jdbcType=VARCHAR}
+        </if>
+      </foreach>
+      )
+    </foreach>
+  </insert>
+</mapper>

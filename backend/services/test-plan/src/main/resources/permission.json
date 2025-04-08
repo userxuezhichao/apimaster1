@@ -1,0 +1,57 @@
+[
+  {
+    "id": "TEST_PLAN",
+    "name": "permission.test_plan.name",
+    "type": "PROJECT",
+    "children": [
+      {
+        "id": "PROJECT_TEST_PLAN",
+        "name": "permission.test_plan",
+        "permissions": [
+          {
+            "id": "PROJECT_TEST_PLAN:READ"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN:READ+ADD"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN:READ+UPDATE"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN:READ+DELETE"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN:READ+ASSOCIATION",
+            "name": "permission.association_and_disassociation"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN:READ+EXECUTE"
+          }
+        ]
+      },
+      {
+        "id": "PROJECT_TEST_PLAN_REPORT",
+        "name": "permission.test_plan_report",
+        "permissions": [
+          {
+            "id": "PROJECT_TEST_PLAN_REPORT:READ"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN_REPORT:READ+UPDATE"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN_REPORT:READ+SHARE",
+            "name": "permission.api_doc.share"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN_REPORT:READ+DELETE"
+          },
+          {
+            "id": "PROJECT_TEST_PLAN_REPORT:READ+EXPORT"
+          }
+        ]
+      }
+    ],
+    "order": 5
+  }
+]

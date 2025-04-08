@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.ExtExecTaskItemMapper">
+    <select id="selectList" resultType="io.metersphere.system.dto.taskhub.TaskHubItemDTO">
+        SELECT exec_task_item.*, exec_task.num, exec_task.task_name, exec_task.trigger_mode, exec_task.integrated
+        FROM exec_task_item
+        inner join exec_task on exec_task_item.task_id = exec_task.id
+        <include refid="queryWhereCondition"/>
+    </select>
+    <select id="selectExecInfoByResourceIds" resultType="io.metersphere.system.domain.ExecTaskItem">
+        SELECT id, resource_id
+        FROM exec_task_item
+        WHERE deleted = false and resource_id IN
+        <foreach collection="resourceIds" item="resourceId" open="(" separator="," close=")">
+            #{resourceId}
+        </foreach>
+    </select>
+
+    <select id="getTaskItemIdsByTime" resultType="java.lang.String">
+        select id from exec_task_item where project_id = #{projectId} and start_time &lt;= #{timeMills} and deleted = false
+    </select>
+
+    <select id="selectExecInfoByTaskIdAndResourceIds" resultType="io.metersphere.system.domain.ExecTaskItem">
+        SELECT id, resource_id
+        FROM exec_task_item
+        WHERE deleted = false and task_id = #{taskId} and resource_id IN
+        <foreach collection="resourceIds" item="resourceId" open="(" separator="," close=")">
+            #{resourceId}
+        </foreach>
+    </select>
+
+    <select id="selectExecInfoByTaskIdAndCollectionId" resultType="io.metersphere.system.domain.ExecTaskItem">
+        SELECT id, resource_id
+        FROM exec_task_item
+        WHERE task_id = #{taskId} and collection_id = #{collectionId} and deleted = false
+        <if test="rerun != null and rerun == true">
+            and rerun = true
+        </if>
+    </select>
+
+    <select id="selectItemByTaskIds" resultType="io.metersphere.system.domain.ExecTaskItem">
+        select  id, task_id, `status`, result
+        from exec_task_item
+        where deleted = false and task_id in
+        <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">
+            #{taskId}
+        </foreach>
+        <if test="orgId != null and orgId != ''">
+            and exec_task_item.organization_id = #{orgId}
+        </if>
+        <if test="projectId != null and projectId != ''">
+            and exec_task_item.project_id = #{projectId}
+        </if>
+    </select>
+
+    <select id="selectPoolNodeByIds" resultType="io.metersphere.system.domain.ExecTaskItem">
+        select id, resource_pool_node, resource_pool_id from exec_task_item where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <sql id="queryWhereCondition">
+        <where>
+            exec_task_item.deleted = false
+            <if test="orgId != null and orgId != ''">
+                and exec_task_item.organization_id = #{orgId}
+            </if>
+            <if test="request.keyword != null and request.keyword != ''">
+                and (
+                exec_task.num like concat('%', #{request.keyword},'%')
+                or exec_task.task_name like concat('%', #{request.keyword},'%')
+                or exec_task_item.resource_name like concat('%', #{request.keyword},'%')
+                )
+            </if>
+            <if test="projectId != null and projectId != ''">
+                and exec_task_item.project_id = #{projectId}
+            </if>
+            <if test="request.resourcePoolIds != null and request.resourcePoolIds.size() > 0">
+                and exec_task_item.resource_pool_id in
+                <foreach collection="request.resourcePoolIds" item="resourcePoolId" separator="," open="(" close=")">
+                    #{resourcePoolId}
+                </foreach>
+            </if>
+            <if test="request.resourcePoolNodes != null and request.resourcePoolNodes.size() > 0">
+                and exec_task_item.resource_pool_node in
+                <foreach collection="request.resourcePoolNodes" item="resourcePoolNode" separator="," open="(" close=")">
+                    #{resourcePoolNode}
+                </foreach>
+            </if>
+            <include refid="filters">
+                <property name="filter" value="request.filter"/>
+            </include>
+        </where>
+    </sql>
+
+    <sql id="queryBatchWhereCondition">
+        <include refid="batchFilters">
+            <property name="filter" value="request.filter"/>
+        </include>
+    </sql>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <!-- 状态 -->
+                        <when test="key=='status'">
+                            and exec_task_item.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行结果 -->
+                        <when test="key=='result'">
+                            and exec_task_item.result in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行方式 -->
+                        <when test="key=='triggerMode'">
+                            and exec_task.trigger_mode in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 所属组织 -->
+                        <when test="key=='organizationName'">
+                            and exec_task_item.organization_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 所属项目 -->
+                        <when test="key=='projectName'">
+                            and exec_task_item.project_id in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="batchFilters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <!-- 状态 -->
+                        <when test="key=='status'">
+                            and r.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行结果 -->
+                        <when test="key=='result'">
+                            and r.result in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 执行方式 -->
+                        <when test="key=='triggerMode'">
+                            and r.trigger_mode in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="getResourcePoolsByTaskIds" resultType="io.metersphere.system.domain.ExecTaskItem">
+        SELECT
+        id,
+        task_id,
+        resource_pool_node,
+        resource_pool_id
+        FROM
+        exec_task_item
+        WHERE deleted = false
+        <if test="taskIds != null and taskIds.size() > 0">
+            and task_id IN
+            <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">
+                #{taskId}
+            </foreach>
+        </if>
+    </select>
+
+
+    <update id="batchUpdateTaskItemStatus">
+        UPDATE exec_task_item
+        SET `status` = #{status},
+        executor = #{userId}
+        WHERE  task_id in
+        <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">
+            #{taskId}
+        </foreach>
+        <if test="projectId != null and projectId != ''">
+            and project_id = #{projectId}
+        </if>
+        <if test="organizationId != null and organizationId != ''">
+            and organization_id = #{organizationId}
+        </if>
+        and `status` in ('RUNNING', 'PENDING')
+        and deleted = false
+    </update>
+
+    <select id="hasErrorItem" resultType="java.lang.Boolean">
+        SELECT COUNT(1)
+        FROM exec_task_item
+        WHERE task_id = #{taskId} AND `result` = 'ERROR' and deleted = 0
+        limit 1
+    </select>
+
+    <select id="hasFakeErrorItem" resultType="java.lang.Boolean">
+        SELECT COUNT(1)
+        FROM exec_task_item
+        WHERE task_id = #{taskId} AND `result` = 'FAKE_ERROR' and deleted = 0
+        limit 1
+    </select>
+
+    <select id="getItemIdByTaskIds" resultType="java.lang.String">
+        select id from exec_task_item where task_id in
+        <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">
+            #{taskId}
+        </foreach>
+    </select>
+
+
+    <update id="batchUpdateTaskItemStatusByIds">
+        UPDATE exec_task_item
+        SET `status` = #{status},
+        executor = #{userId}
+        WHERE
+            deleted = false
+            and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        <if test="projectId != null and projectId != ''">
+            and project_id = #{projectId}
+        </if>
+        <if test="organizationId != null and organizationId != ''">
+            and organization_id = #{organizationId}
+        </if>
+        and `status` in ('RUNNING', 'PENDING')
+    </update>
+
+    <select id="getResourcePoolsByItemIds" resultType="io.metersphere.system.domain.ExecTaskItem">
+        SELECT
+        id,
+        resource_pool_node,
+        resource_pool_id
+        FROM
+        exec_task_item
+        where deleted = false
+        <if test="ids != null and ids.size() > 0">
+            and id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+
+    <select id="getIds" resultType="java.lang.String">
+        select exec_task_item.id from exec_task_item
+        inner join exec_task on exec_task_item.task_id = exec_task.id
+        <where>
+            exec_task_item.status = 'RUNNING'
+            and exec_task_item.deleted = false
+            <if test="projectId != null and projectId != ''">
+                and exec_task_item.project_id = #{projectId}
+            </if>
+            <if test="organizationId != null and organizationId != ''">
+                and exec_task_item.organization_id = #{organizationId}
+            </if>
+            <include refid="queryWhereConditionByBaseQueryRequest"/>
+        </where>
+    </select>
+
+    <sql id="queryWhereConditionByBaseQueryRequest">
+        <if test="request.condition.keyword != null and request.condition.keyword != ''">
+            and (
+            exec_task.num like concat('%', #{request.condition.keyword},'%')
+            or exec_task_item.resource_name like concat('%', #{request.condition.keyword},'%')
+            )
+        </if>
+        <include refid="filters">
+            <property name="filter" value="request.condition.filter"/>
+        </include>
+    </sql>
+
+    <select id="list" resultType="io.metersphere.system.dto.BatchExecTaskReportDTO">
+        select r.id, r.name, if(#{tableName} = 'api_report', 'API', 'SCENARIO') as source, false as integrated, r.status,
+               r.exec_status as execStatus, r.trigger_mode triggerMode, r.create_user as createUser, r.start_time as createTime
+        from exec_task_item eti join api_report_relate_task arrt on arrt.task_resource_id = eti.id and eti.deleted = 0
+        join ${tableName} r on arrt.report_id = r.id and r.deleted = 0
+        where eti.task_id = #{request.taskId}
+        <include refid="queryBatchWhereCondition"/>
+    </select>
+    <select id="getUnDeleteCaseExecCount" resultType="java.lang.Long">
+        select Count(exec_task_item.id) from exec_task_item
+            left join api_test_case on  api_test_case.id = exec_task_item.resource_id
+              where api_test_case.deleted = false
+                and exec_task_item.project_id = #{projectId}
+                <if test="startTime != null and endTime != null">
+                    and api_test_case.create_time between #{startTime} and #{endTime}
+                </if>
+                <if test="resourceTypes != null and resourceTypes.size() > 0">
+                    and exec_task_item.resource_type in
+                    <foreach collection="resourceTypes" item="resourceType" open="(" separator="," close=")">
+                        #{resourceType}
+                    </foreach>
+                </if>
+    </select>
+    <select id="getUnDeleteScenarioExecCount" resultType="java.lang.Long">
+        select Count(exec_task_item.id) from exec_task_item
+        left join api_scenario on  api_scenario.id = exec_task_item.resource_id
+        where api_scenario.deleted = false
+        and exec_task_item.project_id = #{projectId}
+        <if test="startTime != null and endTime != null">
+            and api_scenario.create_time between #{startTime} and #{endTime}
+        </if>
+        <if test="resourceTypes != null and resourceTypes.size() > 0">
+            and exec_task_item.resource_type in
+            <foreach collection="resourceTypes" item="resourceType" open="(" separator="," close=")">
+                #{resourceType}
+            </foreach>
+        </if>
+    </select>
+    <select id="selectRerunCollectionIds" resultType="java.lang.String">
+        select distinct collection_id
+        from exec_task_item
+        where task_id = #{taskId} and rerun = true and deleted = false;
+    </select>
+    <select id="selectIdAndResourceIdByTaskId" resultType="io.metersphere.system.domain.ExecTaskItem">
+        select id, resource_id
+        from exec_task_item
+        where task_id = #{taskId} and deleted = false
+    </select>
+
+    <select id="selectRerunIdAndResourceIdByTaskId" resultType="io.metersphere.system.domain.ExecTaskItem">
+        select id, resource_id
+        from exec_task_item
+        where task_id = #{taskId} and rerun = true and deleted = false
+    </select>
+
+    <insert id="insertRerunTaskItem">
+        insert into exec_task_item(id, task_id, resource_id, resource_name, task_origin, status, `result`, resource_pool_id,
+                                   resource_pool_node, resource_type, project_id, organization_id, thread_id, start_time, end_time, executor, collection_id,
+                                   deleted, case_id, error_message, rerun, create_time)
+        select
+            UUID_SHORT(), task_id, resource_id, resource_name, task_origin, 'PENDING', 'PENDING', '',
+            null, resource_type, project_id, organization_id, null, null, null, #{userId}, collection_id,
+            deleted, case_id, null, true, unix_timestamp() * 1000
+        from exec_task_item
+        where deleted = false and task_id = #{taskId} and `result` = 'ERROR'
+    </insert>
+
+    <update id="deleteRerunTaskItem">
+        update exec_task_item
+        set deleted = true
+        where task_id = #{taskId} and `result` = 'ERROR' and rerun = false
+    </update>
+</mapper>

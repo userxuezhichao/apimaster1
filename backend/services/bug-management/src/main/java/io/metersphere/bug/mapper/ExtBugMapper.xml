@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.bug.mapper.ExtBugMapper">
+    <resultMap id="BugDTO" type="io.metersphere.bug.dto.response.BugDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <resultMap id="BugTagEditDTO" type="io.metersphere.bug.dto.response.BugTagEditDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <resultMap id="BugProviderDTO" type="io.metersphere.dto.BugProviderDTO">
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler" />
+    </resultMap>
+
+    <select id="list" resultMap="BugDTO">
+        select b.id, b.num, b.title, b.handle_user, b.create_user, b.create_time, b.update_user, b.update_time, b.delete_user, b.delete_time,
+               b.project_id, b.template_id, b.platform, b.status, b.tags, bc.description from bug b
+        left join bug_content bc on b.id = bc.bug_id
+        <include refid="queryWhereCondition"/>
+        <if test="sort != null and sort != ''">
+            order by ${sort}
+        </if>
+    </select>
+
+    <select id="getLocalLastStepStatusIds" resultType="java.lang.String">
+        select id from status_item si left join status_definition sd on si.id = sd.status_id
+        where scope_type = 'PROJECT' and scope_id = #{projectId} and sd.definition_id = 'END'
+    </select>
+
+    <select id="getIdsByPageRequest" resultType="java.lang.String">
+        select b.id from bug b left join bug_content bc on b.id = bc.bug_id
+        <include refid="queryWhereCondition"/>
+    </select>
+
+    <select id="listByIds" resultMap="BugDTO">
+        select id,
+        num,
+        title,
+        handle_user,
+        create_user,
+        create_time,
+        update_time,
+        delete_time,
+        delete_user,
+        project_id,
+        template_id,
+        platform,
+        status,
+        tags
+        from bug
+        where id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+        <if test="sort != null and sort != ''">
+            order by ${sort}
+        </if>
+    </select>
+
+    <select id="getMaxNum" resultType="java.lang.Long">
+        select max(num) from bug where project_id = #{projectId}
+    </select>
+
+    <select id="getBugTagList" resultMap="BugTagEditDTO">
+        select id as bugId, tags from bug where id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="batchUpdate" parameterType="io.metersphere.bug.dto.request.BugBatchUpdateRequest">
+        update bug
+        <set>
+            <if test="request.tags != null and request.tags != ''">
+                tags = #{request.tags, typeHandler=io.metersphere.handler.ListTypeHandler},
+            </if>
+            <if test="request.updateUser != null and request.updateUser != ''">
+                update_user = #{request.updateUser},
+            </if>
+            <if test="request.updateTime != null">
+                update_time = #{request.updateTime},
+            </if>
+        </set>
+        where id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="getPrePos" resultType="java.lang.Long">
+        select `pos` from bug where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &lt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+
+    <select id="getLastPos" resultType="java.lang.Long">
+        select `pos` from bug where project_id = #{projectId}
+        <if test="basePos != null">
+            and `pos` &gt; #{basePos}
+        </if>
+        order by `pos` desc limit 1;
+    </select>
+
+    <select id="getMaxPos" resultType="java.lang.Long">
+        select max(pos) from bug where project_id = #{projectId}
+    </select>
+
+    <select id="listByProviderRequest" resultMap="BugProviderDTO">
+        SELECT
+        b.id as id,
+        b.num as num,
+        b.title as name,
+        b.handle_user as handleUser,
+        createUser.id AS createUser,
+        createUser.name AS createUserName,
+        bc.description AS content,
+        b.`status` as status,
+        b.tags as tags,
+        b.create_time createTime
+        FROM
+        bug b
+        LEFT JOIN  bug_content bc ON  b.id = bc.bug_id
+        LEFT JOIN user createUser ON b.create_user = createUser.id
+        WHERE
+        b.deleted = #{deleted}
+        AND b.id NOT IN
+        (
+        select associate.${bugColumnName} from ${table} associate  where  associate.${sourceName} = #{request.sourceId}
+        )
+        <include refid="queryWhereConditionByProvider"/>
+        ORDER BY b.num DESC
+    </select>
+
+    <select id="getIdsByProvider" resultType="java.lang.String">
+        SELECT
+        b.id
+        FROM
+        bug b
+        WHERE b.deleted =#{deleted}
+        <include refid="queryWhereConditionByProvider"/>
+    </select>
+
+    <sql id="queryWhereCondition">
+        <where>
+            <if test="request.useTrash">
+                b.deleted = 1
+            </if>
+            <if test="!request.useTrash">
+                b.deleted = 0
+            </if>
+            <if test="request.projectId != null and request.projectId != ''">
+                and b.project_id = #{request.projectId}
+            </if>
+            <if test="request.keyword != null and request.keyword != ''">
+                and (
+                b.title like concat('%', #{request.keyword},'%')
+                or b.num like concat('%', #{request.keyword},'%')
+                or b.tags like concat('%', #{request.keyword},'%')
+                )
+            </if>
+            <!-- 待办参数 -->
+            <if test="request.todoParam != null">
+                and (
+                    <!-- Local平台: 非结束状态&&处理人为当前登录用户 -->
+                    (
+                        b.platform = 'Local'
+                        <if test="request.todoParam.msLastStepStatus != null and request.todoParam.msLastStepStatus.size() > 0">
+                            and b.status not in
+                            <foreach collection="request.todoParam.msLastStepStatus" item="lastStatus" separator="," open="(" close=")">
+                                #{lastStatus}
+                            </foreach>
+                        </if>
+                        <if test="request.todoParam.msUserId != null and request.todoParam.msUserId != '' and request.assignedToMe">
+                            and b.handle_user = #{request.todoParam.msUserId}
+                        </if>
+                    )
+                    <if test="request.todoParam.currentPlatform != null and request.todoParam.currentPlatform != 'Local'">
+                    <!-- 插件平台: 非平台结束状态&&处理人为个人中心账号配置 -->
+                    or
+                        (
+                            b.platform = #{request.todoParam.currentPlatform}
+                            <if test="request.todoParam.platformLastStatus != null and request.todoParam.platformLastStatus.size() > 0">
+                                and b.status not in
+                                <foreach collection="request.todoParam.platformLastStatus" item="lastStatus" separator="," open="(" close=")">
+                                    #{lastStatus}
+                                </foreach>
+                            </if>
+                            <if test="request.todoParam.platformUser != null and request.todoParam.platformUser != '' and request.assignedToMe">
+                                and b.handle_user = #{request.todoParam.platformUser}
+                            </if>
+                        )
+                    </if>
+                )
+            </if>
+            <!-- 工作台参数 -->
+            <if test="request.createByMe">
+                and b.create_user = #{request.todoParam.msUserId}
+            </if>
+            <if test="request.relatedToPlan">
+                and b.id in (
+                    select distinct bug.id
+                    from test_plan
+                    left join bug_relation_case on test_plan.id = bug_relation_case.test_plan_id
+                    left join bug on bug_relation_case.bug_id = bug.id
+                    where test_plan.status = 'NOT_ARCHIVED' and bug.deleted = false and test_plan.project_id = #{request.projectId}
+                )
+            </if>
+            <include refid="filter"/>
+            <include refid="combine">
+                <property name="combineSearch" value="request.combineSearch"/>
+                <property name="projectId" value="${request.projectId}"/>
+                <property name="deleted" value="${request.useTrash}"/>
+            </include>
+        </where>
+    </sql>
+
+    <sql id="filter">
+        <if test="request.filter != null and request.filter.size() > 0">
+            <foreach collection="request.filter.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0">
+                    <choose>
+                        <!-- 处理人 -->
+                        <when test="key == 'handleUser'">
+                            and b.handle_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 删除人 -->
+                        <when test="key == 'deleteUser'">
+                            and b.delete_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 更新人 -->
+                        <when test="key == 'updateUser'">
+                            and b.update_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 创建人 -->
+                        <when test="key == 'createUser'">
+                            and b.create_user in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 平台 -->
+                        <when test="key == 'platform'">
+                            and b.platform in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 状态 -->
+                        <when test="key == 'status'">
+                            and b.status in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                        </when>
+                        <!-- 自定义单选字段 -->
+                        <when test="key.startsWith('custom_single')">
+                            and b.id in (
+                            select bug_id from bug_custom_field where concat('custom_single_', field_id) = #{key}
+                            and trim(both '"' from `value`) in
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                        <!-- 自定义多选字段 -->
+                        <when test="key.startsWith('custom_multiple')">
+                            and b.id in (
+                            select bug_id from bug_custom_field where concat('custom_multiple_', field_id) = #{key}
+                            and
+                            <include refid="io.metersphere.system.mapper.BaseMapper.filterMultipleWrapper"/>
+                            )
+                        </when>
+                    </choose>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="combine">
+        <trim prefix="AND">
+            <trim prefix="(" suffix=")" suffixOverrides="AND|OR">
+                <if test="${combineSearch} != null">
+                    <foreach collection="${combineSearch}.userViewConditions" item="condition">
+                        <if test="condition.name == 'createUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="b.create_user"/>
+                            </include>
+                        </if>
+                        <if test="condition.name == 'follower'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.associationCondition">
+                                <property name="mainIdColumn" value="b.id"/>
+                                <property name="associationTable" value="bug_follower"/>
+                                <property name="associationIdColumn" value="bug_id"/>
+                                <property name="searchColumn" value="user_id"/>
+                                <property name="condition" value="condition"/>
+                            </include>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <foreach collection="${combineSearch}.systemFieldConditions" item="condition">
+                        <include refid="io.metersphere.system.mapper.BaseMapper.commonSystemFieldConditions">
+                            <property name="condition" value="condition"/>
+                            <property name="tablePrefix" value="b"/>
+                        </include>
+                        <!-- 标题 -->
+                        <if test="condition.name == 'title'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="b.title"/>
+                            </include>
+                        </if>
+                        <!-- 状态 -->
+                        <if test="condition.name == 'status'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="b.status"/>
+                            </include>
+                        </if>
+                        <!-- 处理人 -->
+                        <if test="condition.name == 'handleUser'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="b.handle_user"/>
+                            </include>
+                        </if>
+                        <!-- 所属平台 -->
+                        <if test="condition.name == 'platform'">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="b.platform"/>
+                            </include>
+                        </if>
+                        <!-- 用例数 -->
+                        <if test="condition.name == 'relationCaseCount'">
+                            <choose>
+                                <when test="condition.operator == 'NOT_EMPTY'">
+                                    b.id in (
+                                        select distinct b.id from bug b join bug_relation_case brc on b.id = brc.bug_id
+                                        where deleted = ${deleted} and project_id = '${projectId}'
+                                    )
+                                </when>
+                                <when test="condition.operator == 'EMPTY'">
+                                    b.id not in (
+                                        select distinct b.id from bug b join bug_relation_case brc on b.id = brc.bug_id
+                                        where deleted = ${deleted} and project_id = '${projectId}'
+                                    )
+                                </when>
+                                <when test="(condition.operator == 'LT' and condition.value &lt; 1) or (condition.operator == 'EQUALS' and condition.value &lt; 0)">
+                                    1=2
+                                </when>
+                                <otherwise>
+                                    <if test="condition.operator == 'LT' or (condition.operator == 'EQUALS' and condition.value == 0)">
+                                        b.id not in (
+                                            select distinct b.id from bug b join bug_relation_case brc on b.id = brc.bug_id
+                                            where deleted = ${deleted} and project_id = '${projectId}'
+                                        )
+                                        <if test="condition.value &gt; 1">
+                                            OR
+                                        </if>
+                                    </if>
+                                    <if test="(condition.operator == 'EQUALS' and condition.value &gt; 0) or (condition.operator == 'LT' and condition.value &gt; 1) or condition.operator == 'GT'">
+                                        b.id in (
+                                            select distinct b.id from bug b join bug_relation_case brc on b.id = brc.bug_id
+                                            where b.deleted = ${deleted} and b.project_id = '${projectId}' group by b.id having
+                                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                                <property name="condition" value="condition"/>
+                                                <property name="column" value="count(b.id)"/>
+                                            </include>
+                                        )
+                                    </if>
+                                </otherwise>
+                            </choose>
+                        </if>
+                        <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                            <property name="searchMode" value="${combineSearch}.searchMode"/>
+                        </include>
+                    </foreach>
+                    <include refid="io.metersphere.system.mapper.BaseMapper.customFiledConditions">
+                        <property name="mainIdColumn" value="b.id"/>
+                        <property name="associationTable" value="bug_custom_field"/>
+                        <property name="associationIdColumn" value="bug_id"/>
+                        <property name="combineSearch" value="${combineSearch}"/>
+                    </include>
+                </if>
+            </trim>
+        </trim>
+    </sql>
+
+    <sql id="queryWhereConditionByProvider">
+        <if test="request.projectId != null and request.projectId != ''">
+            and b.project_id = #{request.projectId}
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            and (
+                b.title like concat('%', #{request.keyword},'%')
+                or b.num like concat('%', #{request.keyword},'%')
+                or b.tags like concat('%', #{request.keyword},'%')
+            )
+        </if>
+        <include refid="combine">
+            <property name="combineSearch" value="request.combineSearch"/>
+            <property name="projectId" value="${request.projectId}"/>
+            <property name="deleted" value="${request.useTrash}"/>
+        </include>
+    </sql>
+
+    <select id="projectBugCount"
+            resultType="io.metersphere.project.dto.ProjectCountDTO">
+        SELECT bug.project_id as projectId, count(bug.id) as count
+        FROM bug
+        WHERE bug.deleted = false AND project_id IN
+        <foreach collection="projectIds" item="projectId" separator="," open="(" close=")">
+            #{projectId}
+        </foreach>
+        <if test="startTime != null and endTime != null">
+            AND bug.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="userId != null and userId != ''">
+            AND bug.create_user = #{userId}
+        </if>
+        group by bug.project_id;
+    </select>
+
+    <select id="userCreateBugCount"
+            resultType="io.metersphere.project.dto.ProjectUserCreateCount">
+        SELECT bug.create_user as userId, count(bug.id) as count
+        FROM bug
+        WHERE bug.deleted = false
+        AND bug.project_id =  #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND bug.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="userIds != null and userIds.size() > 0">
+            and bug.create_user in
+            <foreach collection="userIds" item="userId" separator="," open="(" close=")">
+                #{userId}
+            </foreach>
+        </if>
+        group by bug.create_user;
+    </select>
+
+    <select id="projectUserBugStatusCount"
+            resultType="io.metersphere.project.dto.ProjectUserStatusCountDTO">
+        SELECT bug.handle_user as userId,  bug.status, count(bug.id) as count
+        FROM bug
+        WHERE bug.deleted = false
+        AND bug.project_id =  #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND bug.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        AND bug.handle_user != ''
+        <if test="userIds != null and userIds.size() > 0">
+            AND bug.handle_user IN
+            <foreach collection="userIds" item="userId" separator="," open="(" close=")">
+                #{userId}
+            </foreach>
+        </if>
+        AND bug.platform IN
+        <foreach collection="platforms" item="platform" separator="," open="(" close=")">
+            #{platform}
+        </foreach>
+        group by bug.handle_user, bug.status order by bug.handle_user;
+    </select>
+
+    <select id="getSimpleList" resultType="io.metersphere.bug.domain.Bug">
+        SELECT bug.id, bug.status, bug.platform, bug.platform_bug_id
+        FROM bug
+        WHERE bug.deleted = false
+        AND bug.project_id = #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND bug.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="handleUsers != null and handleUsers.size() > 0">
+            AND bug.handle_user IN
+            <foreach collection="handleUsers" item="handleUser" separator="," open="(" close=")">
+                #{handleUser}
+            </foreach>
+        </if>
+        <if test="createUser != null and createUser != ''">
+            AND bug.create_user = #{createUser}
+        </if>
+        <if test="platforms != null and platforms.size() > 0">
+            AND bug.platform IN
+            <foreach collection="platforms" item="platform" separator="," open="(" close=")">
+                #{platform}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getByHandleUser" resultType="io.metersphere.bug.domain.Bug">
+        SELECT bug.id, bug.status, bug.platform, bug.platform_bug_id
+        FROM bug
+        WHERE bug.deleted = false
+        AND bug.project_id = #{projectId}
+        <if test="startTime != null and endTime != null">
+            AND bug.create_time BETWEEN #{startTime} AND #{endTime}
+        </if>
+        <if test="createUser != null and createUser != ''">
+            AND bug.create_user = #{createUser}
+        </if>
+        and (
+        ( bug.platform = 'Local'
+            <if test="localHandleUser != null and localHandleUser != ''">
+              AND bug.handle_user = #{localHandleUser}
+            </if>
+            )
+        <if test="thirdPlatform != null and thirdPlatform != '' and thirdPlatform != 'Local'">
+            or (
+            ( bug.platform = #{thirdPlatform}
+            <if test="thirdHandleUser != null and thirdHandleUser != ''">
+                AND bug.handle_user = #{thirdHandleUser}
+            </if>)
+            )
+        </if>
+        )
+    </select>
+
+    <select id="localBugCount"
+            resultType="java.lang.Long">
+        SELECT count(id)
+        FROM bug
+        WHERE bug.deleted = false
+        AND bug.project_id = #{projectId}
+        AND bug.platform = 'Local'
+    </select>
+
+</mapper>
+

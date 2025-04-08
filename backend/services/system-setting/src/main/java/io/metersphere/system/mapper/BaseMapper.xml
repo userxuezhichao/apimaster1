@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.metersphere.system.mapper.BaseMapper">
+
+    <sql id="commonSystemFieldConditions">
+        <include refid="io.metersphere.system.mapper.BaseMapper.baseSystemFieldConditions" />
+        <if test="condition.name == 'moduleId'">
+            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                <property name="condition" value="condition"/>
+                <property name="column" value="${tablePrefix}.module_id"/>
+            </include>
+        </if>
+    </sql>
+
+    <sql id="baseSystemFieldConditions">
+        <if test="condition.name == 'name'">
+            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                <property name="condition" value="condition"/>
+                <property name="column" value="${tablePrefix}.name"/>
+            </include>
+        </if>
+        <if test="condition.name == 'num'">
+            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                <property name="condition" value="condition"/>
+                <property name="column" value="${tablePrefix}.num"/>
+            </include>
+        </if>
+        <if test="condition.name == 'createUser'">
+            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                <property name="condition" value="condition"/>
+                <property name="column" value="${tablePrefix}.create_user"/>
+            </include>
+        </if>
+        <if test="condition.name == 'updateUser'">
+            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                <property name="condition" value="condition"/>
+                <property name="column" value="${tablePrefix}.update_user"/>
+            </include>
+        </if>
+        <if test="condition.name == 'updateTime'">
+            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                <property name="condition" value="condition"/>
+                <property name="column" value="${tablePrefix}.update_time"/>
+            </include>
+        </if>
+        <if test="condition.name == 'createTime'">
+            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                <property name="condition" value="condition"/>
+                <property name="column" value="${tablePrefix}.create_time"/>
+            </include>
+        </if>
+        <if test="condition.name == 'tags'">
+            <include refid="io.metersphere.system.mapper.BaseMapper.arrayValueCondition">
+                <property name="condition" value="condition"/>
+                <property name="column" value="${tablePrefix}.tags"/>
+            </include>
+        </if>
+    </sql>
+
+    <sql id="customFiledConditions">
+        <if test="${combineSearch}.customFiledEmptyConditions.size() > 0">
+            <foreach collection="${combineSearch}.customFiledEmptyConditions" item="condition">
+                ${mainIdColumn} not in (
+                    select ${associationIdColumn} from ${associationTable} where
+                    field_id = #{condition.name} and
+                    `value` is not null and `value` != ''
+                    <if test="condition.customFieldType != null and condition.isMultipleCustomField()">
+                        and `value` != '[]'
+                    </if>
+                )
+                <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                    <property name="searchMode" value="${combineSearch}.searchMode"/>
+                </include>
+            </foreach>
+        </if>
+
+        <if test="${combineSearch}.customFiledNoneConditions.size() > 0">
+            <foreach collection="${combineSearch}.customFiledNoneConditions" item="condition">
+                <trim prefix="(" suffix=")">
+                    ${mainIdColumn} not in (
+                        select ${associationIdColumn} from  ${associationTable} where
+                        field_id = #{condition.name} and
+                        `value` is not null and `value` != ''
+                        <if test="condition.customFieldType != null and condition.isMultipleCustomField()">
+                            and `value` != '[]'
+                        </if>
+                    ) or
+                    ${mainIdColumn} in (
+                        select ${associationIdColumn} from ${associationTable} where
+                        field_id = #{condition.name} and
+                        <choose>
+                            <when test="condition.customFieldType != null and condition.isMultipleCustomField()">
+                                <include refid="io.metersphere.system.mapper.BaseMapper.arrayValueCondition">
+                                    <property name="condition" value="condition"/>
+                                    <property name="column" value="value"/>
+                                </include>
+                            </when>
+                            <otherwise>
+                                <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                    <property name="condition" value="condition"/>
+                                    <property name="column" value="value"/>
+                                </include>
+                            </otherwise>
+                        </choose>
+                    )
+                </trim>
+                <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                    <property name="searchMode" value="${combineSearch}.searchMode"/>
+                </include>
+            </foreach>
+        </if>
+
+        <if test="${combineSearch}.customFiledConditions.size() > 0">
+            <foreach collection="${combineSearch}.customFiledConditions" item="condition">
+                ${mainIdColumn} in (
+                    select ${associationIdColumn} from ${associationTable} where
+                    field_id = #{condition.name} and
+                    <choose>
+                        <when test="condition.customFieldType != null and condition.isMultipleCustomField()">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.arrayValueCondition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="value"/>
+                            </include>
+                        </when>
+                        <when test="condition.customFieldType != null and
+                        (condition.customFieldType == 'DATE' or condition.customFieldType == 'DATETIME')">
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="UNIX_TIMESTAMP(`value`) * 1000"/>
+                            </include>
+                        </when>
+                        <!-- 级联只命中保存的的最后一级数据即可 -->
+                        <when test="condition.customFieldType != null and condition.customFieldType == 'CASCADER'">
+                            <if test="condition.operator == 'IN'">
+                                JSON_EXTRACT(`value`, '$[1]') in
+                                <foreach collection="condition.value" item="v" separator="," open="(" close=")">
+                                    #{v}
+                                </foreach>
+                            </if>
+                            <if test="condition.operator == 'NOT_IN'">
+                                JSON_EXTRACT(`value`, '$[1]') not in
+                                <foreach collection="condition.value" item="v" separator="," open="(" close=")">
+                                    #{v}
+                                </foreach>
+                                or `value` is null
+                            </if>
+                        </when>
+                        <otherwise>
+                            <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                <property name="condition" value="condition"/>
+                                <property name="column" value="value"/>
+                            </include>
+                        </otherwise>
+                    </choose>
+                )
+                <include refid="io.metersphere.system.mapper.BaseMapper.queryType">
+                    <property name="searchMode" value="${combineSearch}.searchMode"/>
+                </include>
+            </foreach>
+        </if>
+    </sql>
+
+    <sql id="arrayValueCondition">
+        <trim prefix="(" suffix=")">
+            <choose>
+                <when test="${condition}.operator == 'CONTAINS'">
+                    <foreach collection="${condition}.value" item="tag" separator="or" open="(" close=")">
+                        JSON_CONTAINS(${column}, JSON_ARRAY(#{tag}))
+                    </foreach>
+                </when>
+                <when test="${condition}.operator == 'IN'">
+                    <foreach collection="${condition}.value" item="tag" separator="or" open="(" close=")">
+                        JSON_CONTAINS(${column}, JSON_ARRAY(#{tag}))
+                    </foreach>
+                </when>
+                <when test="${condition}.operator == 'NOT_CONTAINS'">
+                    ${column} is null or ${column} = '[]' or
+                    <foreach collection="${condition}.value" item="tag" separator="and" open="(" close=")">
+                        not JSON_CONTAINS(${column}, JSON_ARRAY(#{tag}))
+                    </foreach>
+                </when>
+                <when test="${condition}.operator == 'NOT_IN'">
+                    ${column} is null or ${column} = '[]' or
+                    <foreach collection="${condition}.value" item="tag" separator="and" open="(" close=")">
+                        not JSON_CONTAINS(${column}, JSON_ARRAY(#{tag}))
+                    </foreach>
+                </when>
+                <when test="${condition}.operator == 'COUNT_GT'">
+                    JSON_LENGTH(${column}) &gt; #{condition.value}
+                </when>
+                <when test="${condition}.operator == 'COUNT_LT'">
+                    <if test="${condition}.value == 0">
+                        false
+                    </if>
+                    <if test="${condition}.value != 0">
+                        ${column} is null or ${column} = '[]' or
+                        JSON_LENGTH(${column}) &lt; #{condition.value}
+                    </if>
+                </when>
+                <when test="${condition}.operator == 'EMPTY'">
+                    ${column} is null or ${column} = '[]'
+                </when>
+                <when test="${condition}.operator == 'NOT_EMPTY'">
+                    ${column} is not null and ${column} != '[]'
+                </when>
+            </choose>
+        </trim>
+    </sql>
+
+    <sql id="associationCondition">
+        <choose>
+            <when test="${condition}.operator == 'EMPTY'">
+                ${mainIdColumn} not in (
+                    select ${associationIdColumn} from ${associationTable} where
+                    ${searchColumn} is not null and ${searchColumn} != ''
+                )
+            </when>
+            <otherwise>
+                (
+                    ${mainIdColumn}
+                    <if test="${condition}.operator == 'NOT_IN' or ${condition}.operator == 'NOT_EQUALS' or ${condition}.operator == 'NOT_CONTAINS'">
+                       not
+                    </if>
+                    in (
+                        select ${associationIdColumn} from  ${associationTable} where
+                        <choose>
+                            <when test="${condition}.operator == 'NOT_IN' or ${condition}.operator == 'NOT_EQUALS' or ${condition}.operator == 'NOT_CONTAINS'">
+                                <include refid="io.metersphere.system.mapper.BaseMapper.associationReversalCondition">
+                                    <property name="condition" value="${condition}"/>
+                                    <property name="column" value="${searchColumn}"/>
+                                </include>
+                            </when>
+                            <otherwise>
+                                <include refid="io.metersphere.system.mapper.BaseMapper.condition">
+                                    <property name="condition" value="${condition}"/>
+                                    <property name="column" value="${searchColumn}"/>
+                                </include>
+                            </otherwise>
+                        </choose>
+                    )
+                )
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="condition">
+        <trim prefix="(" suffix=")">
+            <choose>
+                <when test="${condition}.operator == 'CONTAINS'">
+                    <foreach collection="${condition}.value.split(' ')" item="item" separator="and">
+                        ${column} like CONCAT('%', #{item},'%')
+                    </foreach>
+                </when>
+                <when test="${condition}.operator == 'NOT_CONTAINS'">
+                    <foreach collection="${condition}.value.split(' ')" item="item" separator="or">
+                        ${column} not like CONCAT('%', #{item},'%')
+                        or ${column} is null
+                    </foreach>
+                </when>
+                <when test="${condition}.operator == 'IN'">
+                    <if test="'${column}' == 'value'">
+                        `value`
+                    </if>
+                    <if test="'${column}' != 'value'">
+                        ${column}
+                    </if>
+                    in
+                    <foreach collection="${condition}.value" item="v" separator="," open="(" close=")">
+                        #{v}
+                    </foreach>
+                </when>
+                <when test="${condition}.operator == 'NOT_IN'">
+                    <if test="'${column}' == 'value'">
+                        `value`
+                    </if>
+                    <if test="'${column}' != 'value'">
+                        ${column}
+                    </if>
+                    not in
+                    <foreach collection="${condition}.value" item="v" separator="," open="(" close=")">
+                        #{v}
+                    </foreach>
+                    or ${column} is null
+                </when>
+                <when test="${condition}.operator == 'BETWEEN'">
+                    ${column} between #{condition.value[0]} and #{condition.value[1]}
+                </when>
+                <when test="${condition}.operator == 'GT'">
+                    ${column} is not null and ${column} != '' and ${column} &gt; #{condition.value}
+                </when>
+                <when test="${condition}.operator == 'LT'">
+                    ${column} is not null and ${column} != '' and ${column} &lt; #{condition.value}
+                </when>
+                <when test="${condition}.operator == 'COUNT_GT'">
+                    JSON_LENGTH(${column}) &gt; #{condition.value}
+                </when>
+                <when test="${condition}.operator == 'COUNT_LT'">
+                    JSON_LENGTH(${column}) &lt; #{condition.value}
+                </when>
+                <when test="${condition}.operator == 'EMPTY'">
+                    ${column} is null or ${column} = ''
+                </when>
+                <when test="${condition}.operator == 'NOT_EMPTY'">
+                    ${column} is not null and ${column} != ''
+                </when>
+                <when test="${condition}.operator == 'EQUALS'">
+                    ${column} = #{condition.value}
+                </when>
+                <when test="${condition}.operator == 'NOT_EQUALS'">
+                    ${column} != #{condition.value}
+                    or ${column} is null
+                </when>
+            </choose>
+        </trim>
+    </sql>
+
+    <sql id="associationReversalCondition">
+        <trim prefix="(" suffix=")">
+            <choose>
+                <when test="${condition}.operator == 'NOT_CONTAINS'">
+                    <foreach collection="${condition}.value.split(' ')" item="item" separator="and">
+                        ${column} like CONCAT('%', #{item},'%')
+                    </foreach>
+                </when>
+                <when test="${condition}.operator == 'NOT_IN'">
+                    <if test="'${column}' == 'value'">
+                        `value`
+                    </if>
+                    <if test="'${column}' != 'value'">
+                        ${column}
+                    </if>
+                    in
+                    <foreach collection="${condition}.value" item="v" separator="," open="(" close=")">
+                        #{v}
+                    </foreach>
+                </when>
+                <when test=" ${condition}.operator == 'NOT_EQUALS'">
+                    ${column} = #{condition.value}
+                </when>
+            </choose>
+        </trim>
+    </sql>
+
+    <sql id="queryType">
+        <choose>
+            <when test="${searchMode} == 'AND'">
+                AND
+            </when>
+            <when test="${searchMode} == 'OR'">
+                OR
+            </when>
+        </choose>
+    </sql>
+
+    <sql id="filterInWrapper">
+        <foreach collection="values" item="value" separator="," open="(" close=")">
+            #{value}
+        </foreach>
+    </sql>
+
+    <sql id="filterMultipleWrapper">
+        <foreach collection="values" item="value" separator="or" open="(" close=")">
+            JSON_CONTAINS(`value`, JSON_ARRAY(#{value}))
+        </foreach>
+    </sql>
+
+    <sql id="filters">
+        <if test="${filter} != null and ${filter}.size() > 0">
+            <foreach collection="${filter}.entrySet()" index="key" item="values">
+                <if test="values != null and values.size() > 0 fields.contains(key)" >
+                    <where>
+                        ${table_name}.${key} in
+                        <foreach collection="values" item="value" separator="," open="(" close=")">
+                            #{value}
+                        </foreach>
+                    </where>
+                </if>
+            </foreach>
+        </if>
+    </sql>
+</mapper>
